@@ -1,0 +1,24 @@
+:root {
+  --cor-primaria: #FFD600;
+  --cor-primaria2: #FF8F00;
+  --cor-fundo: #f4f4f5;
+  --cor-superficie: #ffffff;
+  --cor-borda: #e4e4e7;
+  --cor-texto: #18181b;
+  --cor-texto-secundario: #71717a;
+  --m-gradiente: linear-gradient(135deg, #FFD600 0%, #FF8F00 100%);
+  --m-preto: #0D0D0D;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+  min-height: 100vh;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

@@ -1,0 +1,169 @@
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.65);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 2000; padding: 16px;
+  backdrop-filter: blur(4px);
+}
+
+.modal {
+  background: #fff; border-radius: 24px;
+  width: 100%; max-width: 560px;
+  max-height: 92vh; display: flex; flex-direction: column;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.4);
+  overflow: hidden;
+}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+.header {
+  background: linear-gradient(135deg, #6366f1, #4f46e5);
+  padding: 20px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.headerTitulo { display: flex; align-items: center; gap: 12px; }
+.headerIcone  { font-size: 36px; }
+.headerTitulo h2 { margin: 0; font-size: 20px; font-weight: 900; color: #fff; }
+.headerSub { margin: 3px 0 0; font-size: 13px; color: rgba(255,255,255,0.8); font-weight: 500; }
+.fechar {
+  background: rgba(0,0,0,0.25); border: none; border-radius: 50%;
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  color: #fff; cursor: pointer; flex-shrink: 0;
+}
+.fechar:hover { background: rgba(255,255,255,0.2); }
+
+/* ── Banner rascunho ─────────────────────────────────────────────────────── */
+.bannerRascunho {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 18px;
+  background: #fefce8; border-bottom: 1px solid #fde68a;
+  font-size: 13px; color: #92400e; font-weight: 600;
+  flex-shrink: 0;
+}
+.bannerRascunho > span { flex: 1; }
+
+.btnRestaurar {
+  display: flex; align-items: center; gap: 5px;
+  padding: 6px 12px; background: #92400e; border: none; border-radius: 8px;
+  color: #fff; font-size: 12px; font-weight: 800; cursor: pointer; font-family: inherit;
+  flex-shrink: 0;
+}
+.btnRestaurar:hover { background: #78350f; }
+
+.btnDescartar {
+  background: none; border: 1.5px solid #d97706; border-radius: 6px;
+  padding: 5px 6px; color: #92400e; cursor: pointer; display: flex; align-items: center;
+  flex-shrink: 0;
+}
+.btnDescartar:hover { background: #fef3c7; }
+
+/* ── Corpo ───────────────────────────────────────────────────────────────── */
+.corpo {
+  flex: 1; overflow-y: auto; padding: 20px;
+  display: flex; flex-direction: column; gap: 16px;
+}
+
+/* ── Item card ───────────────────────────────────────────────────────────── */
+.itemCard {
+  border: 2px solid #e4e4e7; border-radius: 16px;
+  padding: 16px; display: flex; flex-direction: column; gap: 12px;
+  background: #fafafa;
+}
+.itemHeader {
+  display: flex; align-items: center; justify-content: space-between;
+}
+.itemNumero {
+  font-size: 11px; font-weight: 800; color: #6366f1;
+  text-transform: uppercase; letter-spacing: 0.6px;
+}
+.btnRemoverItem {
+  background: none; border: 1.5px solid #fca5a5; border-radius: 8px;
+  padding: 5px 8px; color: #dc2626; cursor: pointer;
+  display: flex; align-items: center; transition: background 0.15s;
+}
+.btnRemoverItem:hover { background: #fee2e2; }
+
+/* ── Fotos ───────────────────────────────────────────────────────────────── */
+.fotosGrid {
+  display: flex; flex-wrap: wrap; gap: 10px;
+}
+.fotoItem {
+  position: relative; width: 74px; height: 74px;
+}
+.fotoImg {
+  width: 100%; height: 100%; object-fit: cover;
+  border-radius: 10px; border: 2px solid #e4e4e7;
+}
+.fotoEditar {
+  position: absolute; top: -5px; left: -5px;
+  background: #7c3aed; border: none; border-radius: 50%;
+  width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+  color: #fff; cursor: pointer;
+  box-shadow: 0 2px 6px rgba(124,58,237,0.5);
+  transition: transform 0.15s;
+}
+.fotoEditar:hover { transform: scale(1.15); }
+.fotoRemover {
+  position: absolute; top: -5px; right: -5px;
+  background: #dc2626; border: none; border-radius: 50%;
+  width: 22px; height: 22px; display: flex; align-items: center; justify-content: center;
+  color: #fff; cursor: pointer;
+  box-shadow: 0 2px 6px rgba(220,38,38,0.4);
+  transition: transform 0.15s;
+}
+.fotoRemover:hover { transform: scale(1.15); }
+.fotoAdd {
+  width: 74px; height: 74px;
+  border: 2px dashed #d1d5db; border-radius: 10px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; cursor: pointer; color: #9ca3af; font-size: 10px; font-weight: 700;
+  transition: all 0.2s;
+}
+.fotoAdd:hover { border-color: #6366f1; color: #6366f1; }
+
+/* ── Descrição ───────────────────────────────────────────────────────────── */
+.descricaoWrap { display: flex; flex-direction: column; gap: 6px; }
+.descricaoLabelRow {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+}
+.descricaoLabel {
+  font-size: 11px; font-weight: 800; color: #6b7280;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.textarea {
+  padding: 10px 12px; border: 2px solid #e4e4e7; border-radius: 10px;
+  font-size: 14px; color: #111; font-family: inherit;
+  resize: vertical; outline: none; transition: border-color 0.2s;
+  background: #fff;
+}
+.textarea:focus { border-color: #6366f1; }
+
+/* ── Adicionar item ──────────────────────────────────────────────────────── */
+.btnAdicionarItem {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px; border: 2px dashed #c7d2fe; border-radius: 14px;
+  background: #eef2ff; color: #4338ca; font-size: 15px; font-weight: 800;
+  cursor: pointer; font-family: inherit; transition: all 0.2s;
+}
+.btnAdicionarItem:hover { background: #e0e7ff; border-color: #818cf8; }
+
+/* ── Rodapé ──────────────────────────────────────────────────────────────── */
+.rodape {
+  padding: 16px 20px; border-top: 1px solid #e4e4e7;
+  display: flex; gap: 10px; justify-content: flex-end;
+  background: #fafafa; flex-shrink: 0;
+}
+.btnCancelar {
+  padding: 11px 20px; background: none; border: 2px solid #e4e4e7;
+  border-radius: 10px; font-size: 14px; font-weight: 700;
+  cursor: pointer; color: #6b7280; font-family: inherit;
+}
+.btnSalvar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 11px 26px; background: linear-gradient(135deg, #6366f1, #4f46e5); border: none;
+  border-radius: 10px; font-size: 14px; font-weight: 900;
+  color: #fff; cursor: pointer; font-family: inherit;
+  box-shadow: 0 4px 14px rgba(99,102,241,0.4);
+  transition: all 0.15s;
+}
+.btnSalvar:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(99,102,241,0.5); }

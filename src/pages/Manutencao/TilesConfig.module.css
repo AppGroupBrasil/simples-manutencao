@@ -1,0 +1,613 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONFIGURADOR DE LAYOUT — TILES DAS FUNÇÕES FIXAS
+   Modal de configuração acessível pelo ícone de engrenagem
+════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Botão engrenagem ────────────────────────────────────────────────────── */
+.gearBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(255, 214, 0, 0.3);
+  background: #0D0D0D;
+  color: #FFD600;
+  cursor: pointer;
+  transition: all 0.25s;
+  flex-shrink: 0;
+}
+.gearBtn:hover {
+  border-color: #FFD600;
+  color: #FF8F00;
+  background: #1a1a1a;
+  transform: rotate(45deg);
+}
+
+/* ── Overlay ─────────────────────────────────────────────────────────────── */
+.cfgOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(6px);
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: cfgFadeIn 0.2s ease;
+}
+.cfgBackdrop {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  border: none;
+  cursor: default;
+  z-index: 0;
+}
+@keyframes cfgFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Modal ───────────────────────────────────────────────────────────────── */
+.cfgModal {
+  position: relative;
+  z-index: 1;
+  background: var(--cor-superficie, #fff);
+  border-radius: 24px;
+  width: 95%;
+  max-width: 680px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.3);
+  animation: cfgSlideUp 0.3s cubic-bezier(.4,0,.2,1);
+}
+@keyframes cfgSlideUp {
+  from { transform: translateY(40px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+
+.cfgHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid var(--cor-borda, #e4e4e7);
+}
+.cfgTitulo {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--cor-texto, #0D0D0D);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cfgFechar {
+  width: 32px; height: 32px; border-radius: 10px;
+  border: none; background: var(--cor-fundo, #f3f4f6);
+  color: var(--cor-texto-secundario, #6b7280);
+  cursor: pointer; display: flex; align-items: center;
+  justify-content: center; transition: background 0.2s;
+}
+.cfgFechar:hover { background: #e5e7eb; }
+
+.cfgBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+/* ── Seção ────────────────────────────────────────────────────────────────── */
+.cfgSecao {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cfgSecaoTitulo {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: var(--cor-texto-secundario, #9ca3af);
+}
+
+/* ── Layout selector (5 opções) ──────────────────────────────────────────── */
+.cfgLayouts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.cfgLayoutBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 8px 12px;
+  border-radius: 14px;
+  border: 2px solid var(--cor-borda, #e4e4e7);
+  background: var(--cor-fundo, #f9fafb);
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--cor-texto, #0D0D0D);
+}
+.cfgLayoutBtn:hover {
+  border-color: var(--m-amarelo, #FFD600);
+  background: rgba(255,214,0,0.05);
+}
+.cfgLayoutBtn.cfgLayoutAtivo {
+  border-color: var(--m-amarelo, #FFD600);
+  background: rgba(255,214,0,0.1);
+  box-shadow: 0 0 0 3px rgba(255,214,0,0.15);
+}
+.cfgLayoutMini {
+  width: 100%;
+  height: 48px;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cfgLayoutNome {
+  font-size: 10px;
+  font-weight: 800;
+  text-align: center;
+  line-height: 1.3;
+}
+
+/* Mini layout icons */
+.miniSimples { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 2px; width: 36px; }
+.miniSimples span { width: 10px; height: 10px; border-radius: 3px; background: var(--m-amarelo, #FFD600); }
+.miniSimples span:first-child { grid-column: span 2; width: auto; }
+
+.miniGlass { display: flex; gap: 3px; width: 36px; align-items: center; }
+.miniGlass span { width: 10px; height: 18px; border-radius: 4px; background: var(--m-amarelo, #FFD600); opacity: 0.6; }
+.miniGlass span:nth-child(2) { opacity: 0.8; }
+.miniGlass span:nth-child(3) { opacity: 0.4; }
+
+.miniBento { display: grid; grid-template-columns: 2fr 1fr; gap: 2px; width: 38px; }
+.miniBento span { height: 10px; border-radius: 3px; background: var(--m-amarelo, #FFD600); }
+.miniBento span:first-child { grid-column: span 1; height: 22px; grid-row: span 2; }
+
+.miniList { display: flex; flex-direction: column; gap: 3px; width: 36px; }
+.miniList span { height: 6px; border-radius: 3px; background: var(--m-amarelo, #FFD600); width: 100%; }
+
+.miniDock { display: flex; gap: 3px; align-items: flex-end; }
+.miniDock span { width: 8px; height: 8px; border-radius: 50%; background: var(--m-amarelo, #FFD600); }
+
+.miniDash { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; width: 40px; }
+.miniDash span { height: 14px; border-radius: 3px; background: var(--m-amarelo, #FFD600); }
+
+/* ── Presets rápidos ─────────────────────────────────────────────────────── */
+.cfgPresets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.cfgPresetBtn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1.5px solid var(--cor-borda, #e4e4e7);
+  background: var(--cor-fundo, #f9fafb);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.cfgPresetBtn:hover {
+  border-color: var(--m-amarelo, #FFD600);
+  transform: scale(1.04);
+}
+.cfgPresetBtn.cfgPresetAtivo {
+  border-color: var(--m-amarelo, #FFD600);
+  background: rgba(255,214,0,0.1);
+}
+.cfgPresetDot {
+  width: 12px; height: 12px; border-radius: 4px;
+  border: 1px solid rgba(0,0,0,0.06);
+}
+.cfgPresetNome {
+  font-size: 11px; font-weight: 700;
+  color: var(--cor-texto, #0D0D0D);
+}
+
+/* ── Card color pickers ──────────────────────────────────────────────────── */
+.cfgCards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cfgCardRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1.5px solid var(--cor-borda, #e4e4e7);
+  background: var(--cor-fundo, #f9fafb);
+  flex-wrap: wrap;
+}
+.cfgCardInfo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 140px;
+  flex: 1;
+}
+.cfgCardDot {
+  width: 28px; height: 28px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.cfgCardNome {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--cor-texto, #0D0D0D);
+  line-height: 1.3;
+}
+.cfgColorPickers {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.cfgColorField {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.cfgColorLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--cor-texto-secundario, #9ca3af);
+}
+.cfgColorInput {
+  width: 30px; height: 26px;
+  border: none; border-radius: 6px;
+  cursor: pointer; background: transparent;
+  padding: 0;
+}
+.cfgColorInput::-webkit-color-swatch-wrapper { padding: 1px; }
+.cfgColorInput::-webkit-color-swatch { border-radius: 5px; border: 1px solid rgba(0,0,0,0.1); }
+
+/* ── Botão resetar ───────────────────────────────────────────────────────── */
+.cfgResetBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1.5px solid var(--cor-borda, #e4e4e7);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--cor-texto-secundario, #6b7280);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.cfgResetBtn:hover {
+  border-color: #b91c1c;
+  color: #b91c1c;
+  background: rgba(239,68,68,0.1);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LAYOUTS ALTERNATIVOS PARA OS TILES
+════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Layout A: Glass Scroll ───────────────────────────────────────────────── */
+.tilesGlass {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding-bottom: 12px;
+  scroll-snap-type: x mandatory;
+  margin-top: 20px;
+  margin-bottom: 36px;
+  -webkit-overflow-scrolling: touch;
+}
+.tilesGlass::-webkit-scrollbar { height: 4px; }
+.tilesGlass::-webkit-scrollbar-track { background: transparent; }
+.tilesGlass::-webkit-scrollbar-thumb { background: var(--cor-borda, #d1d5db); border-radius: 4px; }
+
+.tileGlass {
+  min-width: 200px;
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  border-radius: 20px;
+  padding: 28px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(0,0,0,0.06);
+  font-family: inherit;
+  width: 200px;
+}
+.tileGlass:hover {
+  transform: translateY(-6px) scale(1.02);
+  box-shadow: 0 12px 40px rgba(0,0,0,0.12);
+}
+.tileGlassGlow {
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  opacity: 0.12;
+  filter: blur(30px);
+  pointer-events: none;
+}
+.tileGlassIcone {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(0,0,0,0.06);
+  margin-bottom: 4px;
+  line-height: 1;
+}
+.tileGlassNome {
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+  line-height: 1.3;
+}
+.tileGlassAction {
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 6px 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(0,0,0,0.06);
+  margin-top: auto;
+  cursor: pointer;
+}
+
+/* ── Layout B: Bento Grid ────────────────────────────────────────────────── */
+.tilesBento {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 16px;
+  margin-top: 20px;
+  margin-bottom: 36px;
+}
+.tileBento {
+  border-radius: 20px;
+  padding: 22px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.25s;
+  border: none;
+  font-family: inherit;
+  text-align: left;
+  width: 100%;
+}
+.tileBento:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.15); }
+.tileBentoTop { display: flex; align-items: center; justify-content: space-between; }
+.tileBentoIcone {
+  width: 44px; height: 44px; border-radius: 13px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; background: rgba(255,255,255,0.15);
+  line-height: 1;
+}
+.tileBentoNome { font-size: 16px; font-weight: 900; line-height: 1.3; }
+.tileBentoDesc { font-size: 11px; opacity: 0.5; line-height: 1.4; }
+.tileBentoBtn {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 10px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.8px; padding: 7px 16px; border-radius: 10px;
+  background: rgba(0,0,0,0.12); border: none;
+  width: fit-content; margin-top: auto; cursor: pointer;
+  font-family: inherit; color: inherit;
+}
+.tileBentoStripe {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 3px; border-radius: 0 0 20px 20px;
+}
+.tileBentoBig {
+  grid-column: span 2;
+  min-height: 170px;
+}
+
+/* ── Layout C: Lista Elegante ────────────────────────────────────────────── */
+.tilesList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
+  margin-bottom: 36px;
+}
+.tileList {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+  overflow: hidden;
+  border: none;
+  font-family: inherit;
+  width: 100%;
+  text-align: left;
+}
+.tileList:hover { transform: translateX(4px); }
+.tileListBar {
+  width: 4px; height: 40px; border-radius: 4px; flex-shrink: 0;
+}
+.tileListIcone {
+  width: 44px; height: 44px; border-radius: 13px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+  line-height: 1;
+}
+.tileListInfo { flex: 1; }
+.tileListNome { font-size: 15px; font-weight: 800; }
+.tileListDesc { font-size: 11px; opacity: 0.5; margin-top: 2px; }
+.tileListArrow {
+  width: 32px; height: 32px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; flex-shrink: 0;
+  background: rgba(0,0,0,0.08); color: rgba(0,0,0,0.6);
+  transition: all 0.2s;
+}
+.tileList:hover .tileListArrow { background: rgba(0,0,0,0.12); color: rgba(0,0,0,0.85); }
+
+/* ── Layout D: Dock Icons ────────────────────────────────────────────────── */
+.tilesDock {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 20px;
+  margin-bottom: 36px;
+}
+.tileDock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 18px 14px 14px;
+  border-radius: 22px;
+  width: 128px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(.4,0,.2,1);
+  border: 1.5px solid var(--cor-borda, #e4e4e7);
+  background: var(--cor-superficie, #fff);
+  font-family: inherit;
+  color: var(--cor-texto, #0D0D0D);
+}
+.tileDock:hover {
+  transform: translateY(-8px) scale(1.05);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.1);
+}
+.tileDockIcone {
+  width: 52px; height: 52px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; transition: box-shadow 0.3s;
+  line-height: 1;
+}
+.tileDock:hover .tileDockIcone { box-shadow: 0 0 20px rgba(0,0,0,0.08); }
+.tileDockNome {
+  font-size: 12px; font-weight: 800;
+  text-align: center; line-height: 1.3;
+}
+.tileDockDot {
+  width: 6px; height: 6px; border-radius: 50%;
+  margin-top: auto; opacity: 0.5;
+}
+
+/* ── Layout E: Dashboard Cards ───────────────────────────────────────────── */
+.tilesDash {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+  margin-bottom: 36px;
+}
+.tileDash {
+  border-radius: 18px;
+  padding: 18px 14px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.25s;
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+  border: 1.5px solid var(--cor-borda, #e4e4e7);
+  background: var(--cor-superficie, #fff);
+  font-family: inherit;
+  width: 100%;
+}
+.tileDash:hover { transform: translateY(-4px); box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
+.tileDashRibbon {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+}
+.tileDashIcone {
+  width: 48px; height: 48px; border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px;
+  transition: transform 0.3s;
+  line-height: 1;
+}
+.tileDash:hover .tileDashIcone { transform: rotate(-6deg) scale(1.1); }
+.tileDashNome {
+  font-size: 13px; font-weight: 800; line-height: 1.3;
+  color: var(--cor-texto, #0D0D0D);
+}
+.tileDashAction {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; opacity: 0.5;
+  display: flex; align-items: center; gap: 4px;
+  margin-top: auto;
+  color: var(--cor-texto, #0D0D0D);
+}
+
+/* ── Help button (all layouts) ───────────────────────────────────────────── */
+.tileHelp {
+  position: absolute;
+  top: 8px; right: 8px;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.15);
+  border: 1.5px solid rgba(255,255,255,0.3);
+  color: rgba(255,255,255,0.8);
+  font-size: 13px; font-weight: 900;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 2; line-height: 1;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVO
+════════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  .cfgLayouts { grid-template-columns: repeat(3, 1fr); }
+  .tilesBento { grid-template-columns: 1fr 1fr; }
+  .tileBentoBig { grid-column: span 2; }
+  .tilesDock { gap: 8px; }
+  .tileDock { width: 100px; padding: 14px 8px 12px; }
+  .tilesDash { grid-template-columns: repeat(2, 1fr); }
+  .tileGlass { min-width: 160px; width: 160px; }
+  .cfgCardRow { flex-direction: column; align-items: flex-start; }
+}
+
+@media (max-width: 400px) {
+  .cfgLayouts { grid-template-columns: repeat(2, 1fr); }
+  .tilesBento { grid-template-columns: 1fr; }
+  .tileBentoBig { grid-column: span 1; }
+  .tileGlass { min-width: 140px; width: 140px; }
+}

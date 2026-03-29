@@ -1,0 +1,221 @@
+/* ── Overlay ─────────────────────────────────────────────────────────────── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.92);
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+/* ── Editor container ────────────────────────────────────────────────────── */
+.editor {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #111;
+}
+
+/* ── Toolbar ─────────────────────────────────────────────────────────────── */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 14px;
+  background: #1e1e2e;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  overflow-x: auto;
+  flex-shrink: 0;
+  scrollbar-width: none;
+}
+.toolbar::-webkit-scrollbar { display: none; }
+
+.toolGrupo {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.separador {
+  width: 1px;
+  height: 32px;
+  background: rgba(255,255,255,0.12);
+  margin: 0 6px;
+  flex-shrink: 0;
+}
+
+/* ── Botões de ferramenta ────────────────────────────────────────────────── */
+.toolBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.06);
+  border: 1.5px solid transparent;
+  border-radius: 10px;
+  cursor: pointer;
+  color: rgba(255,255,255,0.6);
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.toolBtn:hover {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+}
+.toolBtnAtivo {
+  background: linear-gradient(135deg, #7c3aed, #a855f7) !important;
+  border-color: rgba(168,85,247,0.5) !important;
+  color: #fff !important;
+  box-shadow: 0 3px 12px rgba(124,58,237,0.5);
+}
+
+.toolIcone {
+  font-size: 18px;
+  line-height: 1;
+  font-style: normal;
+  font-weight: 700;
+}
+.toolLabel {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+/* ── Cores ───────────────────────────────────────────────────────────────── */
+.corBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2.5px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.corBtn:hover { transform: scale(1.15); }
+.corBtnAtivo {
+  transform: scale(1.2) !important;
+  border-color: #fff !important;
+  box-shadow: 0 0 0 2px rgba(255,255,255,0.3);
+}
+
+/* ── Espessura ───────────────────────────────────────────────────────────── */
+.espBtn {
+  width: 36px;
+  height: 36px;
+  background: rgba(255,255,255,0.06);
+  border: 1.5px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.espBtn:hover { background: rgba(255,255,255,0.12); }
+.espBtnAtivo {
+  background: rgba(255,255,255,0.18) !important;
+  border-color: rgba(255,255,255,0.4) !important;
+}
+
+/* ── Desfazer ────────────────────────────────────────────────────────────── */
+.undoBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(255,255,255,0.07);
+  border: 1.5px solid rgba(255,255,255,0.15);
+  border-radius: 10px;
+  color: rgba(255,255,255,0.8);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.undoBtn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.14);
+  color: #fff;
+}
+.undoBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* ── Canvas area ─────────────────────────────────────────────────────────── */
+.canvasWrap {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0a0a0a;
+  position: relative;
+}
+
+.canvas {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  /* Sombra suave para destacar a imagem */
+  box-shadow: 0 0 40px rgba(0,0,0,0.8);
+}
+
+/* ── Rodapé ──────────────────────────────────────────────────────────────── */
+.rodape {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 12px 16px;
+  background: #1e1e2e;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+}
+
+.btnCancelar {
+  padding: 10px 22px;
+  background: rgba(255,255,255,0.08);
+  border: 1.5px solid rgba(255,255,255,0.18);
+  border-radius: 10px;
+  color: rgba(255,255,255,0.8);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.btnCancelar:hover {
+  background: rgba(255,255,255,0.14);
+  color: #fff;
+}
+
+.btnSalvar {
+  padding: 10px 28px;
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+  border: none;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 900;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  box-shadow: 0 4px 14px rgba(34,197,94,0.4);
+}
+.btnSalvar:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(34,197,94,0.5);
+}

@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run:*)",
+      "Bash(ssh -i ~/.ssh/hetzner_key -o StrictHostKeyChecking=no root@46.225.191.114 \"cd /opt/simples-manutencao && docker build -t simples-manutencao . 2>&1 | tail -5\")"
+    ]
+  }
+}

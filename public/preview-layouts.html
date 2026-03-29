@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Escolha o Layout — Funções Fixas</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #0a0a0a;
+    color: #fff;
+    padding: 32px 20px 80px;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 28px;
+    font-weight: 900;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, #FFD600, #FF8F00);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .subtitle {
+    text-align: center;
+    font-size: 14px;
+    color: #888;
+    margin-bottom: 48px;
+  }
+
+  .layout-section {
+    max-width: 900px;
+    margin: 0 auto 64px;
+    border: 2px solid #222;
+    border-radius: 24px;
+    padding: 32px 24px;
+    background: #111;
+    position: relative;
+  }
+
+  .layout-section::before {
+    content: attr(data-label);
+    position: absolute;
+    top: -14px;
+    left: 24px;
+    background: linear-gradient(135deg, #FFD600, #FF8F00);
+    color: #0a0a0a;
+    font-size: 13px;
+    font-weight: 900;
+    padding: 4px 16px;
+    border-radius: 20px;
+    letter-spacing: 0.5px;
+  }
+
+  .layout-desc {
+    font-size: 13px;
+    color: #777;
+    margin-bottom: 24px;
+    line-height: 1.5;
+  }
+
+  .bg-mock { background: #1a1a1a; border-radius: 16px; padding: 24px; }
+
+  /* ═══════════════════════════════════════════════
+     LAYOUT A — GLASS HORIZONTAL SCROLL
+  ═══════════════════════════════════════════════ */
+  .layout-a {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    padding-bottom: 12px;
+    scroll-snap-type: x mandatory;
+  }
+  .layout-a::-webkit-scrollbar { height: 4px; }
+  .layout-a::-webkit-scrollbar-track { background: transparent; }
+  .layout-a::-webkit-scrollbar-thumb { background: #333; border-radius: 4px; }
+
+  .card-a {
+    min-width: 200px;
+    flex-shrink: 0;
+    scroll-snap-align: start;
+    border-radius: 20px;
+    padding: 28px 20px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.08);
+  }
+  .card-a:hover { transform: translateY(-6px) scale(1.02); }
+
+  .card-a .icon-wrap {
+    width: 64px; height: 64px;
+    border-radius: 18px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px;
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.15);
+    margin-bottom: 4px;
+  }
+  .card-a .name { font-size: 14px; font-weight: 800; text-align: center; line-height: 1.3; }
+  .card-a .action {
+    font-size: 10px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 1px; padding: 6px 16px; border-radius: 20px;
+    background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.15);
+    color: inherit; margin-top: auto;
+  }
+  .card-a .glow {
+    position: absolute; top: -40px; right: -40px;
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    opacity: 0.15;
+    filter: blur(30px);
+    pointer-events: none;
+  }
+
+  .ca-yellow { background: linear-gradient(160deg, rgba(255,214,0,0.15), rgba(255,143,0,0.08)); }
+  .ca-yellow .glow { background: #FFD600; }
+  .ca-dark { background: linear-gradient(160deg, rgba(30,30,30,0.9), rgba(20,20,20,0.95)); border-color: rgba(255,214,0,0.15); color: #FFD600; }
+  .ca-dark .glow { background: #FFD600; }
+  .ca-blue { background: linear-gradient(160deg, rgba(21,101,192,0.2), rgba(21,101,192,0.08)); }
+  .ca-blue .glow { background: #42A5F5; }
+  .ca-navy { background: linear-gradient(160deg, rgba(13,71,161,0.2), rgba(13,71,161,0.08)); }
+  .ca-navy .glow { background: #1976D2; }
+  .ca-green { background: linear-gradient(160deg, rgba(46,125,50,0.2), rgba(46,125,50,0.08)); }
+  .ca-green .glow { background: #66BB6A; }
+
+  /* ═══════════════════════════════════════════════
+     LAYOUT B — BENTO GRID (ASSIMÉTRICO)
+  ═══════════════════════════════════════════════ */
+  .layout-b {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: auto auto;
+    gap: 16px;
+  }
+
+  .card-b {
+    border-radius: 20px;
+    padding: 24px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.25s;
+  }
+  .card-b:hover { transform: translateY(-4px); box-shadow: 0 12px 40px rgba(0,0,0,0.5); }
+
+  .card-b .top-row { display: flex; align-items: center; justify-content: space-between; }
+  .card-b .icon-circle {
+    width: 48px; height: 48px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px;
+    background: rgba(255,255,255,0.15);
+  }
+  .card-b .help-btn {
+    width: 24px; height: 24px; border-radius: 50%;
+    border: 1.5px solid rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.85);
+    font-size: 12px; font-weight: 900;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .card-b .name { font-size: 16px; font-weight: 900; line-height: 1.3; }
+  .card-b .desc { font-size: 11px; color: rgba(255,255,255,0.75); line-height: 1.4; }
+  .card-b .action-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.8px; padding: 8px 18px; border-radius: 12px;
+    background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.15);
+    color: #fff; cursor: pointer; margin-top: auto; width: fit-content;
+  }
+  .card-b .stripe {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 3px; border-radius: 0 0 20px 20px;
+  }
+
+  .cb-big { grid-column: span 2; min-height: 180px; }
+
+  .cb-yellow { background: linear-gradient(145deg, #FFD600, #FF8F00); color: #0D0D0D; }
+  .cb-yellow .desc { color: rgba(0,0,0,0.65); }
+  .cb-yellow .icon-circle { background: rgba(0,0,0,0.12); }
+  .cb-yellow .action-btn { background: rgba(0,0,0,0.18); color: #0D0D0D; border-color: rgba(0,0,0,0.15); }
+  .cb-yellow .help-btn { border-color: rgba(0,0,0,0.25); background: rgba(0,0,0,0.12); color: rgba(0,0,0,0.75); }
+
+  .cb-dark { background: #0D0D0D; color: #FFD600; border: 1px solid rgba(255,214,0,0.15); }
+  .cb-dark .desc { color: rgba(255,214,0,0.7); }
+  .cb-dark .stripe { background: #FFD600; }
+
+  .cb-blue { background: linear-gradient(145deg, #1565C0, #0D47A1); }
+  .cb-blue .stripe { background: #42A5F5; }
+
+  .cb-navy { background: linear-gradient(145deg, #0D47A1, #0a3270); }
+  .cb-navy .stripe { background: #1976D2; }
+
+  .cb-green { background: linear-gradient(145deg, #2E7D32, #1B5E20); }
+  .cb-green .stripe { background: #66BB6A; }
+
+  /* ═══════════════════════════════════════════════
+     LAYOUT C — LISTA HORIZONTAL COMPACTA
+  ═══════════════════════════════════════════════ */
+  .layout-c {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .card-c {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .card-c:hover { transform: translateX(4px); }
+
+  .card-c .indicator {
+    width: 4px; height: 40px; border-radius: 4px;
+    flex-shrink: 0;
+  }
+  .card-c .icon-box {
+    width: 48px; height: 48px; border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+  }
+  .card-c .info { flex: 1; }
+  .card-c .info .name { font-size: 15px; font-weight: 800; }
+  .card-c .info .desc { font-size: 11px; color: rgba(255,255,255,0.75); margin-top: 2px; }
+  .card-c .arrow {
+    width: 32px; height: 32px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0;
+    background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.75);
+    transition: all 0.2s;
+  }
+  .card-c:hover .arrow { background: rgba(255,255,255,0.2); color: #fff; }
+
+  .cc-yellow { background: linear-gradient(90deg, rgba(255,214,0,0.1), transparent); }
+  .cc-yellow .indicator { background: #FFD600; }
+  .cc-yellow .icon-box { background: rgba(255,214,0,0.15); color: #CCAB00; }
+  .cc-yellow .name { color: #FFD600; }
+
+  .cc-dark { background: linear-gradient(90deg, rgba(255,214,0,0.05), transparent); border: 1px solid rgba(255,214,0,0.08); }
+  .cc-dark .indicator { background: #FF8F00; }
+  .cc-dark .icon-box { background: rgba(255,214,0,0.1); color: #CCAB00; }
+  .cc-dark .name { color: #FFD600; }
+
+  .cc-blue { background: linear-gradient(90deg, rgba(21,101,192,0.12), transparent); }
+  .cc-blue .indicator { background: #1565C0; }
+  .cc-blue .icon-box { background: rgba(21,101,192,0.2); color: #64B5F6; }
+  .cc-blue .name { color: #42A5F5; }
+
+  .cc-navy { background: linear-gradient(90deg, rgba(13,71,161,0.12), transparent); }
+  .cc-navy .indicator { background: #0D47A1; }
+  .cc-navy .icon-box { background: rgba(13,71,161,0.2); color: #7986CB; }
+  .cc-navy .name { color: #90CAF9; }
+
+  .cc-green { background: linear-gradient(90deg, rgba(46,125,50,0.12), transparent); }
+  .cc-green .indicator { background: #2E7D32; }
+  .cc-green .icon-box { background: rgba(46,125,50,0.2); color: #81C784; }
+  .cc-green .name { color: #66BB6A; }
+
+  /* ═══════════════════════════════════════════════
+     LAYOUT D — ROUNDED PILL / DOCK STYLE
+  ═══════════════════════════════════════════════ */
+  .layout-d {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .card-d {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 20px 14px 16px;
+    border-radius: 24px;
+    width: 130px;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(.4,0,.2,1);
+    position: relative;
+    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.03);
+  }
+  .card-d:hover {
+    transform: translateY(-8px) scale(1.05);
+    border-color: rgba(255,255,255,0.15);
+  }
+
+  .card-d .icon-pill {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px;
+    position: relative;
+    transition: box-shadow 0.3s;
+  }
+  .card-d:hover .icon-pill { box-shadow: 0 0 24px rgba(255,255,255,0.15); }
+
+  .card-d .name { font-size: 12px; font-weight: 800; text-align: center; line-height: 1.3; }
+  .card-d .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    margin-top: auto;
+    opacity: 0.6;
+  }
+
+  .cd-yellow .icon-pill { background: linear-gradient(135deg, #FFD600, #FF8F00); color: #0D0D0D; }
+  .cd-yellow .name { color: #FFD600; }
+  .cd-yellow .dot { background: #FFD600; }
+  .cd-yellow:hover { background: rgba(255,214,0,0.06); border-color: rgba(255,214,0,0.2); }
+
+  .cd-dark .icon-pill { background: #1a1a1a; color: #FFD600; border: 1.5px solid rgba(255,214,0,0.3); }
+  .cd-dark .name { color: #FFD600; }
+  .cd-dark .dot { background: #FF8F00; }
+  .cd-dark:hover { background: rgba(255,214,0,0.04); border-color: rgba(255,214,0,0.15); }
+
+  .cd-blue .icon-pill { background: linear-gradient(135deg, #1565C0, #1976D2); color: #fff; }
+  .cd-blue .name { color: #42A5F5; }
+  .cd-blue .dot { background: #42A5F5; }
+  .cd-blue:hover { background: rgba(21,101,192,0.08); border-color: rgba(66,165,245,0.2); }
+
+  .cd-navy .icon-pill { background: linear-gradient(135deg, #0D47A1, #1565C0); color: #fff; }
+  .cd-navy .name { color: #90CAF9; }
+  .cd-navy .dot { background: #5C6BC0; }
+  .cd-navy:hover { background: rgba(13,71,161,0.08); border-color: rgba(144,202,249,0.2); }
+
+  .cd-green .icon-pill { background: linear-gradient(135deg, #2E7D32, #388E3C); color: #fff; }
+  .cd-green .name { color: #66BB6A; }
+  .cd-green .dot { background: #66BB6A; }
+  .cd-green:hover { background: rgba(46,125,50,0.08); border-color: rgba(102,187,106,0.2); }
+
+  /* ═══════════════════════════════════════════════
+     LAYOUT E — MODERN DASHBOARD (NEUMORPHIC)
+  ═══════════════════════════════════════════════ */
+  .layout-e {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 14px;
+  }
+
+  .card-e {
+    border-radius: 20px;
+    padding: 20px 14px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    transition: all 0.25s;
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+  }
+  .card-e:hover { transform: translateY(-4px); }
+
+  .card-e .ribbon {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+  }
+
+  .card-e .icon-hex {
+    width: 56px; height: 56px;
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px;
+    transform: rotate(0deg);
+    transition: transform 0.3s;
+  }
+  .card-e:hover .icon-hex { transform: rotate(-6deg) scale(1.1); }
+
+  .card-e .name { font-size: 13px; font-weight: 800; line-height: 1.3; }
+  .card-e .action-link {
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; opacity: 0.7;
+    display: flex; align-items: center; gap: 4px;
+    margin-top: auto;
+  }
+
+  .ce-yellow {
+    background: #181400;
+    border: 1px solid rgba(255,214,0,0.12);
+    box-shadow: 0 4px 20px rgba(255,214,0,0.08);
+  }
+  .ce-yellow .ribbon { background: linear-gradient(90deg, #FFD600, #FF8F00); }
+  .ce-yellow .icon-hex { background: rgba(255,214,0,0.12); color: #CCAB00; }
+  .ce-yellow .name { color: #FFD600; }
+  .ce-yellow .action-link { color: #FFD600; }
+  .ce-yellow:hover { border-color: rgba(255,214,0,0.3); box-shadow: 0 8px 32px rgba(255,214,0,0.12); }
+
+  .ce-dark {
+    background: #0D0D0D;
+    border: 1px solid rgba(255,214,0,0.08);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  .ce-dark .ribbon { background: #FFD600; }
+  .ce-dark .icon-hex { background: rgba(255,214,0,0.08); color: #CCAB00; }
+  .ce-dark .name { color: #FFD600; }
+  .ce-dark .action-link { color: #FF8F00; }
+  .ce-dark:hover { border-color: rgba(255,214,0,0.2); }
+
+  .ce-blue {
+    background: #0a1929;
+    border: 1px solid rgba(21,101,192,0.15);
+    box-shadow: 0 4px 20px rgba(21,101,192,0.08);
+  }
+  .ce-blue .ribbon { background: linear-gradient(90deg, #1565C0, #42A5F5); }
+  .ce-blue .icon-hex { background: rgba(21,101,192,0.15); color: #64B5F6; }
+  .ce-blue .name { color: #fff; }
+  .ce-blue .action-link { color: #42A5F5; }
+  .ce-blue:hover { border-color: rgba(66,165,245,0.3); box-shadow: 0 8px 32px rgba(21,101,192,0.15); }
+
+  .ce-navy {
+    background: #060d1a;
+    border: 1px solid rgba(13,71,161,0.15);
+    box-shadow: 0 4px 20px rgba(13,71,161,0.08);
+  }
+  .ce-navy .ribbon { background: linear-gradient(90deg, #0D47A1, #1976D2); }
+  .ce-navy .icon-hex { background: rgba(13,71,161,0.15); color: #7986CB; }
+  .ce-navy .name { color: #90CAF9; }
+  .ce-navy .action-link { color: #7986CB; }
+  .ce-navy:hover { border-color: rgba(92,107,192,0.3); }
+
+  .ce-green {
+    background: #0a1a0c;
+    border: 1px solid rgba(46,125,50,0.15);
+    box-shadow: 0 4px 20px rgba(46,125,50,0.08);
+  }
+  .ce-green .ribbon { background: linear-gradient(90deg, #2E7D32, #66BB6A); }
+  .ce-green .icon-hex { background: rgba(46,125,50,0.15); color: #81C784; }
+  .ce-green .name { color: #fff; }
+  .ce-green .action-link { color: #66BB6A; }
+  .ce-green:hover { border-color: rgba(102,187,106,0.3); box-shadow: 0 8px 32px rgba(46,125,50,0.15); }
+
+
+  /* ═══════════════════════════════════════════════
+     RESPONSIVE
+  ═══════════════════════════════════════════════ */
+  @media (max-width: 640px) {
+    .layout-b { grid-template-columns: 1fr 1fr; }
+    .cb-big { grid-column: span 2; }
+    .layout-d { gap: 8px; }
+    .card-d { width: 100px; padding: 14px 8px 12px; }
+    .layout-e { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  @media (max-width: 400px) {
+    .layout-b { grid-template-columns: 1fr; }
+    .cb-big { grid-column: span 1; }
+    .layout-e { grid-template-columns: 1fr 1fr; }
+  }
+
+  /* ══ vote buttons ══ */
+  .vote-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 20px;
+  }
+  .vote-btn {
+    padding: 10px 28px;
+    border-radius: 12px;
+    border: 2px solid rgba(255,214,0,0.3);
+    background: rgba(255,214,0,0.06);
+    color: #E6C200;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .vote-btn:hover {
+    background: linear-gradient(135deg, #FFD600, #FF8F00);
+    color: #0D0D0D;
+    border-color: transparent;
+    transform: scale(1.05);
+  }
+  .vote-btn.selected {
+    background: linear-gradient(135deg, #FFD600, #FF8F00) !important;
+    color: #0D0D0D !important;
+    border-color: transparent !important;
+    transform: scale(1.08);
+    box-shadow: 0 4px 20px rgba(255,214,0,0.35);
+  }
+
+  .selected-label {
+    text-align: center;
+    margin-top: 16px;
+    font-size: 16px;
+    font-weight: 800;
+    color: #FFD600;
+    display: none;
+  }
+  .selected-label.show { display: block; }
+</style>
+</head>
+<body>
+
+<h1>Escolha o Novo Layout</h1>
+<p class="subtitle">Clique no botão de voto abaixo de cada opção para escolher</p>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     LAYOUT A — GLASS HORIZONTAL
+══════════════════════════════════════════════════════════════════════ -->
+<section class="layout-section" data-label="LAYOUT A — Glass Scroll">
+  <p class="layout-desc">
+    Cards em vidro (glassmorphism) com scroll horizontal. Visual premium, moderno, com efeito de luz suave. Ideal para destaque rápido.
+  </p>
+  <div class="bg-mock">
+    <div class="layout-a">
+      <div class="card-a ca-yellow">
+        <div class="glow"></div>
+        <div class="icon-wrap">➕</div>
+        <div class="name">Personalizar<br>Manutenção</div>
+        <div class="action">+ Criar</div>
+      </div>
+      <div class="card-a ca-dark">
+        <div class="glow"></div>
+        <div class="icon-wrap">📋</div>
+        <div class="name">Manutenção Livre</div>
+        <div class="action">+ Registrar</div>
+      </div>
+      <div class="card-a ca-blue">
+        <div class="glow"></div>
+        <div class="icon-wrap">📝</div>
+        <div class="name">Checklist</div>
+        <div class="action">+ Acessar</div>
+      </div>
+      <div class="card-a ca-navy">
+        <div class="glow"></div>
+        <div class="icon-wrap">📋</div>
+        <div class="name">Ordem de Serviço</div>
+        <div class="action">+ Abrir</div>
+      </div>
+      <div class="card-a ca-green">
+        <div class="glow"></div>
+        <div class="icon-wrap">👥</div>
+        <div class="name">Funcionários</div>
+        <div class="action">+ Acessar</div>
+      </div>
+    </div>
+  </div>
+  <div class="vote-bar">
+    <button class="vote-btn" onclick="vote('A', this)">⭐ Votar no A</button>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     LAYOUT B — BENTO GRID
+══════════════════════════════════════════════════════════════════════ -->
+<section class="layout-section" data-label="LAYOUT B — Bento Grid">
+  <p class="layout-desc">
+    Grid assimétrico estilo "Bento" (Apple). O card principal (Personalizar) ocupa 2 colunas. Cards com descrição e barra de destaque inferior.
+  </p>
+  <div class="bg-mock">
+    <div class="layout-b">
+      <div class="card-b cb-yellow cb-big">
+        <div class="top-row">
+          <div class="icon-circle">➕</div>
+          <div class="help-btn">?</div>
+        </div>
+        <div class="name">Personalizar Manutenção</div>
+        <div class="desc">Crie campos e categorias personalizadas para seus chamados</div>
+        <div class="action-btn">+ Criar Novo</div>
+      </div>
+      <div class="card-b cb-dark">
+        <div class="top-row">
+          <div class="icon-circle">📋</div>
+          <div class="help-btn">?</div>
+        </div>
+        <div class="name">Manutenção Livre</div>
+        <div class="desc">Registro rápido sem template</div>
+        <div class="action-btn">+ Registrar</div>
+        <div class="stripe"></div>
+      </div>
+      <div class="card-b cb-blue">
+        <div class="top-row">
+          <div class="icon-circle">📝</div>
+          <div class="help-btn">?</div>
+        </div>
+        <div class="name">Checklist</div>
+        <div class="desc">Listas de verificação diária</div>
+        <div class="action-btn">+ Acessar</div>
+        <div class="stripe"></div>
+      </div>
+      <div class="card-b cb-navy">
+        <div class="top-row">
+          <div class="icon-circle">📋</div>
+          <div class="help-btn">?</div>
+        </div>
+        <div class="name">Ordem de Serviço</div>
+        <div class="desc">Gerencie ordens de serviço</div>
+        <div class="action-btn">+ Abrir</div>
+        <div class="stripe"></div>
+      </div>
+      <div class="card-b cb-green">
+        <div class="top-row">
+          <div class="icon-circle">👥</div>
+          <div class="help-btn">?</div>
+        </div>
+        <div class="name">Funcionários</div>
+        <div class="desc">Equipes e tarefas</div>
+        <div class="action-btn">+ Acessar</div>
+        <div class="stripe"></div>
+      </div>
+    </div>
+  </div>
+  <div class="vote-bar">
+    <button class="vote-btn" onclick="vote('B', this)">⭐ Votar no B</button>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     LAYOUT C — LISTA HORIZONTAL
+══════════════════════════════════════════════════════════════════════ -->
+<section class="layout-section" data-label="LAYOUT C — Lista Elegante">
+  <p class="layout-desc">
+    Lista vertical com indicador lateral colorido, ícone arredondado e seta de ação. Clean e fácil de expandir. Ótimo para mobile.
+  </p>
+  <div class="bg-mock">
+    <div class="layout-c">
+      <div class="card-c cc-yellow">
+        <div class="indicator"></div>
+        <div class="icon-box">➕</div>
+        <div class="info">
+          <div class="name">Personalizar Manutenção</div>
+          <div class="desc">Crie campos e categorias personalizadas</div>
+        </div>
+        <div class="arrow">→</div>
+      </div>
+      <div class="card-c cc-dark">
+        <div class="indicator"></div>
+        <div class="icon-box">📋</div>
+        <div class="info">
+          <div class="name">Manutenção Livre</div>
+          <div class="desc">Registro rápido sem template</div>
+        </div>
+        <div class="arrow">→</div>
+      </div>
+      <div class="card-c cc-blue">
+        <div class="indicator"></div>
+        <div class="icon-box">📝</div>
+        <div class="info">
+          <div class="name">Checklist</div>
+          <div class="desc">Listas de verificação diária</div>
+        </div>
+        <div class="arrow">→</div>
+      </div>
+      <div class="card-c cc-navy">
+        <div class="indicator"></div>
+        <div class="icon-box">📋</div>
+        <div class="info">
+          <div class="name">Ordem de Serviço</div>
+          <div class="desc">Gerencie ordens de serviço</div>
+        </div>
+        <div class="arrow">→</div>
+      </div>
+      <div class="card-c cc-green">
+        <div class="indicator"></div>
+        <div class="icon-box">👥</div>
+        <div class="info">
+          <div class="name">Funcionários</div>
+          <div class="desc">Equipes e tarefas</div>
+        </div>
+        <div class="arrow">→</div>
+      </div>
+    </div>
+  </div>
+  <div class="vote-bar">
+    <button class="vote-btn" onclick="vote('C', this)">⭐ Votar no C</button>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     LAYOUT D — DOCK / PILL ICONS
+══════════════════════════════════════════════════════════════════════ -->
+<section class="layout-section" data-label="LAYOUT D — Dock Icons">
+  <p class="layout-desc">
+    Estilo dock (macOS/iOS) com ícones circulares que flutuam ao hover. Minimalista, compacto, ótimo quando há muitas funções.
+  </p>
+  <div class="bg-mock">
+    <div class="layout-d">
+      <div class="card-d cd-yellow">
+        <div class="icon-pill">➕</div>
+        <div class="name">Personalizar<br>Manutenção</div>
+        <div class="dot"></div>
+      </div>
+      <div class="card-d cd-dark">
+        <div class="icon-pill">📋</div>
+        <div class="name">Manutenção<br>Livre</div>
+        <div class="dot"></div>
+      </div>
+      <div class="card-d cd-blue">
+        <div class="icon-pill">📝</div>
+        <div class="name">Checklist</div>
+        <div class="dot"></div>
+      </div>
+      <div class="card-d cd-navy">
+        <div class="icon-pill">📋</div>
+        <div class="name">Ordem de<br>Serviço</div>
+        <div class="dot"></div>
+      </div>
+      <div class="card-d cd-green">
+        <div class="icon-pill">👥</div>
+        <div class="name">Funcionários</div>
+        <div class="dot"></div>
+      </div>
+    </div>
+  </div>
+  <div class="vote-bar">
+    <button class="vote-btn" onclick="vote('D', this)">⭐ Votar no D</button>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     LAYOUT E — MODERN DASHBOARD
+══════════════════════════════════════════════════════════════════════ -->
+<section class="layout-section" data-label="LAYOUT E — Dashboard Cards">
+  <p class="layout-desc">
+    Cards escuros com fita colorida no topo, ícones com rotação ao hover, e link de ação. Visual de painel administrativo moderno.
+  </p>
+  <div class="bg-mock">
+    <div class="layout-e">
+      <div class="card-e ce-yellow">
+        <div class="ribbon"></div>
+        <div class="icon-hex">➕</div>
+        <div class="name">Personalizar<br>Manutenção</div>
+        <div class="action-link">+ Criar →</div>
+      </div>
+      <div class="card-e ce-dark">
+        <div class="ribbon"></div>
+        <div class="icon-hex">📋</div>
+        <div class="name">Manutenção<br>Livre</div>
+        <div class="action-link">+ Registrar →</div>
+      </div>
+      <div class="card-e ce-blue">
+        <div class="ribbon"></div>
+        <div class="icon-hex">📝</div>
+        <div class="name">Checklist</div>
+        <div class="action-link">+ Acessar →</div>
+      </div>
+      <div class="card-e ce-navy">
+        <div class="ribbon"></div>
+        <div class="icon-hex">📋</div>
+        <div class="name">Ordem de<br>Serviço</div>
+        <div class="action-link">+ Abrir →</div>
+      </div>
+      <div class="card-e ce-green">
+        <div class="ribbon"></div>
+        <div class="icon-hex">👥</div>
+        <div class="name">Funcionários</div>
+        <div class="action-link">+ Acessar →</div>
+      </div>
+    </div>
+  </div>
+  <div class="vote-bar">
+    <button class="vote-btn" onclick="vote('E', this)">⭐ Votar no E</button>
+  </div>
+</section>
+
+<div id="resultado" class="selected-label"></div>
+
+<script>
+  function vote(layout, btn) {
+    document.querySelectorAll('.vote-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    const el = document.getElementById('resultado');
+    el.textContent = '✓ Layout ' + layout + ' selecionado! Diga a letra no chat para eu implementar.';
+    el.classList.add('show');
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+</script>
+
+</body>
+</html>

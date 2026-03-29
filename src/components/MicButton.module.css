@@ -1,0 +1,81 @@
+.wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Botão principal ─────────────────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 30px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+  color: #fff;
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.45);
+  transition: transform 0.15s, box-shadow 0.15s, background 0.2s;
+  position: relative;
+  overflow: visible;
+}
+
+.btn:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.55);
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+/* ── Estado gravando ─────────────────────────────────────────────────────── */
+.gravando {
+  background: linear-gradient(135deg, #dc2626, #f97316) !important;
+  box-shadow: 0 4px 18px rgba(220, 38, 38, 0.55) !important;
+  animation: brilho 1.5s ease-in-out infinite;
+}
+
+@keyframes brilho {
+  0%, 100% { box-shadow: 0 4px 18px rgba(220, 38, 38, 0.55); }
+  50%       { box-shadow: 0 4px 28px rgba(220, 38, 38, 0.85); }
+}
+
+/* ── Ícone + pulse ───────────────────────────────────────────────────────── */
+.iconeWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.pulse {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  animation: pulsar 1s ease-out infinite;
+}
+
+@keyframes pulsar {
+  0%   { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+/* ── Label ───────────────────────────────────────────────────────────────── */
+.label {
+  white-space: nowrap;
+}
+
+/* ── Erro ────────────────────────────────────────────────────────────────── */
+.erro {
+  font-size: 12px;
+  font-weight: 600;
+  color: #dc2626;
+}

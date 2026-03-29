@@ -1,0 +1,1242 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Simples Manutenção — Apresentação do Sistema</title>
+<style>
+  /* ── RESET ─────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ── TIPOGRAFIA BASE ────────────────────────────── */
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+    color: #18181b;
+    background: #fff;
+    line-height: 1.6;
+  }
+
+  /* ── CORES ──────────────────────────────────────── */
+  :root {
+    --yellow: #FFD600;
+    --orange: #FF8F00;
+    --black:  #0D0D0D;
+    --dark:   #18181b;
+    --gray:   #71717a;
+    --light:  #f4f4f5;
+    --border: #e4e4e7;
+  }
+
+  /* ── PÁGINA ─────────────────────────────────────── */
+  @page {
+    size: A4 portrait;
+    margin: 18mm 16mm;
+  }
+
+  /* ── UTILITÁRIOS ────────────────────────────────── */
+  .no-break   { break-inside: avoid; page-break-inside: avoid; }
+  .page-after { break-after: page;   page-break-after: page;   }
+  .page-before{ break-before: page;  page-break-before: page;  }
+
+  /* ═══════════════════════════════════════════════
+     CAPA
+  ═══════════════════════════════════════════════ */
+  .capa {
+    background: var(--black);
+    color: #fff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 60px 48px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .capa::before {
+    content: '';
+    position: absolute;
+    top: -120px; left: 50%;
+    transform: translateX(-50%);
+    width: 600px; height: 600px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,214,0,0.15) 0%, transparent 65%);
+  }
+
+  .capa-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 60px;
+    position: relative;
+  }
+
+  .capa-logo-icon { font-size: 40px; }
+
+  .capa-logo-text {
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .capa-logo-text strong { color: var(--yellow); }
+
+  .capa-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255,214,0,0.12);
+    color: var(--yellow);
+    border: 1px solid rgba(255,214,0,0.3);
+    border-radius: 99px;
+    padding: 6px 16px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+    position: relative;
+  }
+
+  .capa h1 {
+    font-size: 52px;
+    font-weight: 900;
+    line-height: 1.08;
+    letter-spacing: -2px;
+    color: #fff;
+    margin-bottom: 20px;
+    position: relative;
+  }
+
+  .capa h1 span { color: var(--yellow); }
+
+  .capa-sub {
+    font-size: 17px;
+    color: #a1a1aa;
+    max-width: 540px;
+    line-height: 1.75;
+    margin-bottom: 56px;
+    position: relative;
+  }
+
+  .capa-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    position: relative;
+  }
+
+  .capa-pill {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 99px;
+    padding: 8px 18px;
+    font-size: 13px;
+    color: #d4d4d8;
+    font-weight: 500;
+  }
+
+  .capa-footer {
+    position: absolute;
+    bottom: 36px; left: 48px; right: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    padding-top: 18px;
+  }
+
+  .capa-footer p { font-size: 12px; color: #52525b; }
+  .capa-footer a { font-size: 12px; color: var(--yellow); text-decoration: none; font-weight: 700; }
+
+  /* ═══════════════════════════════════════════════
+     SEÇÕES GENÉRICAS
+  ═══════════════════════════════════════════════ */
+  .secao {
+    padding: 44px 0 36px;
+  }
+
+  .secao-label {
+    display: inline-block;
+    background: rgba(255,183,0,0.1);
+    color: var(--orange);
+    border: 1px solid rgba(255,183,0,0.25);
+    border-radius: 99px;
+    padding: 4px 14px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .secao h2 {
+    font-size: 26px;
+    font-weight: 900;
+    color: var(--black);
+    letter-spacing: -0.8px;
+    margin-bottom: 6px;
+    line-height: 1.2;
+  }
+
+  .secao-sub {
+    font-size: 14px;
+    color: var(--gray);
+    margin-bottom: 28px;
+    line-height: 1.6;
+  }
+
+  /* ═══════════════════════════════════════════════
+     FUNCIONALIDADES — 2 colunas
+  ═══════════════════════════════════════════════ */
+  .feat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .feat-card {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px;
+    background: #fff;
+  }
+
+  .feat-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+
+  .feat-icon {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  .feat-card h3 {
+    font-size: 15px;
+    font-weight: 800;
+    color: var(--black);
+    line-height: 1.3;
+  }
+
+  .feat-card p {
+    font-size: 12.5px;
+    color: var(--gray);
+    line-height: 1.65;
+    margin-bottom: 10px;
+  }
+
+  .feat-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .feat-list li {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: #3f3f46;
+  }
+
+  .check { color: var(--orange); font-weight: 900; font-size: 13px; }
+
+  /* ═══════════════════════════════════════════════
+     COMO FUNCIONA — 4 passos linha
+  ═══════════════════════════════════════════════ */
+  .steps {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
+    gap: 0;
+    align-items: start;
+    margin-top: 4px;
+  }
+
+  .step {
+    padding: 20px 16px;
+    background: var(--light);
+    border-radius: 14px;
+    border: 1px solid var(--border);
+  }
+
+  .step-num {
+    font-size: 28px;
+    font-weight: 900;
+    color: var(--yellow);
+    -webkit-text-stroke: 1px var(--orange);
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .step h3 {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--black);
+    margin-bottom: 6px;
+  }
+
+  .step p {
+    font-size: 12px;
+    color: var(--gray);
+    line-height: 1.6;
+  }
+
+  .step-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 8px;
+    padding-top: 28px;
+    color: var(--orange);
+    font-size: 20px;
+  }
+
+  /* ═══════════════════════════════════════════════
+     EXTRAS — 4 cards linha
+  ═══════════════════════════════════════════════ */
+  .extras {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+
+  .extra-card {
+    background: var(--black);
+    border-radius: 14px;
+    padding: 20px 16px;
+    text-align: center;
+  }
+
+  .extra-icon { font-size: 28px; margin-bottom: 10px; }
+
+  .extra-card h3 {
+    font-size: 13px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 6px;
+  }
+
+  .extra-card p {
+    font-size: 11.5px;
+    color: #71717a;
+    line-height: 1.55;
+  }
+
+  /* ═══════════════════════════════════════════════
+     PERFIS DE ACESSO — 3 colunas
+  ═══════════════════════════════════════════════ */
+  .perfis {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .perfil-card {
+    border-radius: 16px;
+    padding: 24px 20px;
+    border: 1px solid var(--border);
+  }
+
+  .perfil-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 99px;
+    padding: 4px 12px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+    margin-bottom: 14px;
+  }
+
+  .perfil-card h3 {
+    font-size: 17px;
+    font-weight: 900;
+    color: var(--black);
+    margin-bottom: 8px;
+  }
+
+  .perfil-card > p {
+    font-size: 12.5px;
+    color: var(--gray);
+    line-height: 1.6;
+    margin-bottom: 14px;
+  }
+
+  .perfil-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .perfil-list li {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: #3f3f46;
+  }
+
+  /* ═══════════════════════════════════════════════
+     PLANOS — 3 colunas
+  ═══════════════════════════════════════════════ */
+  .planos {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .plano-card {
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 24px 20px;
+    position: relative;
+    background: #fff;
+  }
+
+  .plano-card.destaque {
+    border: 2px solid var(--yellow);
+    background: #fffbeb;
+  }
+
+  .popular-badge {
+    position: absolute;
+    top: -12px; left: 50%;
+    transform: translateX(-50%);
+    background: var(--yellow);
+    color: var(--black);
+    border-radius: 99px;
+    padding: 3px 14px;
+    font-size: 11px;
+    font-weight: 900;
+    white-space: nowrap;
+  }
+
+  .plano-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    margin-bottom: 12px;
+  }
+
+  .plano-card h3 {
+    font-size: 17px;
+    font-weight: 800;
+    color: var(--black);
+    margin-bottom: 4px;
+  }
+
+  .plano-desc { font-size: 12px; color: var(--gray); margin-bottom: 14px; }
+
+  .plano-preco {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    margin-bottom: 4px;
+  }
+
+  .plano-valor {
+    font-size: 34px;
+    font-weight: 900;
+    color: var(--black);
+    letter-spacing: -1.5px;
+    line-height: 1;
+  }
+
+  .plano-periodo { font-size: 12px; color: var(--gray); }
+  .plano-detalhe { font-size: 12px; color: #a1a1aa; margin-bottom: 16px; }
+
+  .plano-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .plano-list li {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: #3f3f46;
+  }
+
+  /* ═══════════════════════════════════════════════
+     PARA QUEM — 5 colunas
+  ═══════════════════════════════════════════════ */
+  .setores {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 12px;
+  }
+
+  .setor-card {
+    background: var(--light);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px 12px;
+    text-align: center;
+  }
+
+  .setor-card.destaque-setor {
+    background: var(--black);
+    border-color: var(--yellow);
+    grid-column: span 2;
+  }
+
+  .setor-emoji { font-size: 28px; margin-bottom: 8px; display: block; }
+
+  .setor-card h3 {
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--black);
+    margin-bottom: 4px;
+  }
+
+  .setor-card.destaque-setor h3 { color: var(--yellow); font-size: 14px; }
+
+  .setor-card p {
+    font-size: 11px;
+    color: var(--gray);
+    line-height: 1.5;
+  }
+
+  .setor-card.destaque-setor p { color: rgba(255,255,255,0.65); }
+
+  /* ═══════════════════════════════════════════════
+     DIFERENCIAS — 3 colunas
+  ═══════════════════════════════════════════════ */
+  .diferenciais {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+
+  .dif-card {
+    display: flex;
+    gap: 12px;
+    background: var(--light);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px;
+  }
+
+  .dif-icon {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: rgba(255,143,0,0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+
+  .dif-card h3 { font-size: 13px; font-weight: 800; color: var(--black); margin-bottom: 4px; }
+  .dif-card p  { font-size: 11.5px; color: var(--gray); line-height: 1.55; }
+
+  /* ═══════════════════════════════════════════════
+     EMPRESA
+  ═══════════════════════════════════════════════ */
+  .empresa-box {
+    background: var(--black);
+    border-radius: 18px;
+    padding: 30px 36px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 32px;
+    align-items: center;
+  }
+
+  .empresa-box h2 {
+    font-size: 24px;
+    font-weight: 900;
+    color: #fff;
+    letter-spacing: -0.5px;
+    margin-bottom: 8px;
+  }
+
+  .empresa-box p { font-size: 13px; color: #a1a1aa; line-height: 1.7; }
+
+  .empresa-dados {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .dado {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+
+  .dado-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #52525b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 3px;
+  }
+
+  .dado-valor { font-size: 13px; color: #d4d4d8; font-weight: 600; }
+
+  /* ═══════════════════════════════════════════════
+     CTA FINAL
+  ═══════════════════════════════════════════════ */
+  .cta-final {
+    background: linear-gradient(135deg, var(--yellow) 0%, var(--orange) 100%);
+    border-radius: 20px;
+    padding: 40px 48px;
+    text-align: center;
+    margin-top: 40px;
+  }
+
+  .cta-final h2 {
+    font-size: 28px;
+    font-weight: 900;
+    color: var(--black);
+    letter-spacing: -0.8px;
+    margin-bottom: 10px;
+  }
+
+  .cta-final p { font-size: 14px; color: rgba(13,13,13,0.75); margin-bottom: 24px; line-height: 1.7; }
+
+  .cta-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    margin-bottom: 24px;
+  }
+
+  .cta-pill {
+    background: rgba(13,13,13,0.1);
+    border: 1px solid rgba(13,13,13,0.15);
+    border-radius: 99px;
+    padding: 7px 16px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--black);
+  }
+
+  .cta-contato {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--black);
+  }
+
+  /* ═══════════════════════════════════════════════
+     RODAPÉ
+  ═══════════════════════════════════════════════ */
+  .rodape {
+    background: var(--black);
+    color: #52525b;
+    text-align: center;
+    padding: 20px 32px;
+    font-size: 11px;
+    margin-top: 32px;
+    border-radius: 12px;
+  }
+
+  /* ═══════════════════════════════════════════════
+     DIVISOR
+  ═══════════════════════════════════════════════ */
+  .divisor {
+    height: 1px;
+    background: var(--border);
+    margin: 32px 0;
+  }
+
+  /* ═══════════════════════════════════════════════
+     PRINT
+  ═══════════════════════════════════════════════ */
+  @media print {
+    body { font-size: 13px; }
+
+    .capa {
+      min-height: 0;
+      height: 100vh;
+      page-break-after: always;
+    }
+
+    .no-break   { break-inside: avoid; page-break-inside: avoid; }
+    .page-after { break-after: page;   page-break-after: page;   }
+    .page-before{ break-before: page;  page-break-before: page;  }
+
+    .secao { padding: 32px 0 24px; }
+
+    /* garante que cards não sejam cortados */
+    .feat-card, .step, .extra-card, .perfil-card,
+    .plano-card, .setor-card, .dif-card, .dado { break-inside: avoid; }
+
+    /* grids ficam em largura total */
+    .feat-grid    { grid-template-columns: 1fr 1fr; }
+    .perfis       { grid-template-columns: repeat(3, 1fr); }
+    .planos       { grid-template-columns: repeat(3, 1fr); }
+    .diferenciais { grid-template-columns: repeat(3, 1fr); }
+    .setores      { grid-template-columns: repeat(5, 1fr); }
+    .extras       { grid-template-columns: repeat(4, 1fr); }
+
+    .cta-final { break-inside: avoid; }
+    .empresa-box { break-inside: avoid; }
+  }
+
+  /* ── PRINT BUTTON (não imprime) ── */
+  .btn-print {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: var(--black);
+    color: var(--yellow);
+    border: none;
+    border-radius: 14px;
+    padding: 14px 24px;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.25);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 999;
+    font-family: inherit;
+  }
+
+  @media print { .btn-print { display: none !important; } }
+</style>
+</head>
+<body>
+
+<button class="btn-print" onclick="window.print()">🖨️ Imprimir / Salvar PDF</button>
+
+<!-- ══════════════════════════════════════════════
+     CAPA
+═══════════════════════════════════════════════ -->
+<div class="capa page-after">
+  <div class="capa-logo">
+    <span class="capa-logo-icon">🔧</span>
+    <span class="capa-logo-text">Simples <strong>Manutenção</strong></span>
+  </div>
+
+  <div class="capa-badge">⚡ Apresentação do Sistema</div>
+
+  <h1>
+    Gestão de manutenção<br>
+    <span>simples e eficiente</span>
+  </h1>
+
+  <p class="capa-sub">
+    Um sistema completo para gerenciar chamados, checklists, equipes e relatórios —
+    sem instalação, sem complicação, acessível de qualquer dispositivo.
+  </p>
+
+  <div class="capa-pills">
+    <span class="capa-pill">✅ Chamados ilimitados</span>
+    <span class="capa-pill">📱 App Android &amp; iOS</span>
+    <span class="capa-pill">📊 Relatórios em PDF</span>
+    <span class="capa-pill">🔒 Segurança LGPD</span>
+    <span class="capa-pill">🕐 Disponível 24/7</span>
+    <span class="capa-pill">💬 Suporte via WhatsApp</span>
+  </div>
+
+  <div class="capa-footer">
+    <p>APP GROUP LTDA - ME · CNPJ 51.797.070/0001-53 · São Paulo/SP</p>
+    <a href="https://simplesmanutencao.com.br">simplesmanutencao.com.br</a>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     FUNCIONALIDADES  (página 2)
+═══════════════════════════════════════════════ -->
+<div class="secao">
+  <div class="secao-label">Funcionalidades</div>
+  <h2>Tudo que você precisa para gerenciar manutenção</h2>
+  <p class="secao-sub">Ferramentas poderosas pensadas para gestores e equipes de campo</p>
+
+  <div class="feat-grid">
+
+    <div class="feat-card no-break">
+      <div class="feat-header">
+        <div class="feat-icon" style="background:linear-gradient(135deg,#FFD600,#FF8F00)">🔧</div>
+        <h3>Chamados de Manutenção</h3>
+      </div>
+      <p>Crie funções personalizadas com ícones e cores exclusivas. Atribua chamados à equipe com um clique e acompanhe o status em tempo real.</p>
+      <ul class="feat-list">
+        <li><span class="check">✓</span> Funções totalmente personalizáveis</li>
+        <li><span class="check">✓</span> Timer automático por chamado</li>
+        <li><span class="check">✓</span> Status: Aberto, Em andamento, Concluído</li>
+        <li><span class="check">✓</span> Compartilhamento via WhatsApp</li>
+      </ul>
+    </div>
+
+    <div class="feat-card no-break">
+      <div class="feat-header">
+        <div class="feat-icon" style="background:linear-gradient(135deg,#3b82f6,#1d4ed8)">📋</div>
+        <h3>Checklists Inteligentes</h3>
+      </div>
+      <p>Crie checklists livres ou administradas. Atribua inspeções a funcionários específicos e acompanhe o progresso com barras visuais.</p>
+      <ul class="feat-list">
+        <li><span class="check">✓</span> Checklist livre ou por administrador</li>
+        <li><span class="check">✓</span> Reporte problemas com foto e áudio</li>
+        <li><span class="check">✓</span> Progresso visual em tempo real</li>
+        <li><span class="check">✓</span> Exportação em PDF</li>
+      </ul>
+    </div>
+
+    <div class="feat-card no-break">
+      <div class="feat-header">
+        <div class="feat-icon" style="background:linear-gradient(135deg,#22c55e,#15803d)">📥</div>
+        <h3>Meus Chamados</h3>
+      </div>
+      <p>Cada funcionário visualiza apenas seus chamados atribuídos. Filtre por status, veja o histórico completo e acompanhe o desempenho.</p>
+      <ul class="feat-list">
+        <li><span class="check">✓</span> Visão individual por funcionário</li>
+        <li><span class="check">✓</span> Filtros por status e data</li>
+        <li><span class="check">✓</span> Histórico completo de atividades</li>
+        <li><span class="check">✓</span> Tempo total registrado</li>
+      </ul>
+    </div>
+
+    <div class="feat-card no-break">
+      <div class="feat-header">
+        <div class="feat-icon" style="background:linear-gradient(135deg,#a855f7,#7c3aed)">📊</div>
+        <h3>Relatórios e Análises</h3>
+      </div>
+      <p>Dashboards com gráficos de barras e pizza para visualizar o desempenho da equipe, taxa de conclusão e histórico de manutenções.</p>
+      <ul class="feat-list">
+        <li><span class="check">✓</span> Gráficos de desempenho da equipe</li>
+        <li><span class="check">✓</span> Taxa de conclusão por período</li>
+        <li><span class="check">✓</span> Exportação de dados</li>
+        <li><span class="check">✓</span> Histórico detalhado</li>
+      </ul>
+    </div>
+
+    <div class="feat-card no-break">
+      <div class="feat-header">
+        <div class="feat-icon" style="background:linear-gradient(135deg,#f43f5e,#be123c)">👥</div>
+        <h3>Gestão de Equipe</h3>
+      </div>
+      <p>Cadastre funcionários com diferentes níveis de acesso. Administradores gerenciam tudo, supervisores monitoram, funcionários executam.</p>
+      <ul class="feat-list">
+        <li><span class="check">✓</span> 3 níveis de acesso hierárquicos</li>
+        <li><span class="check">✓</span> Cadastro e gerenciamento simples</li>
+        <li><span class="check">✓</span> Controle por perfil de acesso</li>
+        <li><span class="check">✓</span> Visibilidade por hierarquia</li>
+      </ul>
+    </div>
+
+    <div class="feat-card no-break">
+      <div class="feat-header">
+        <div class="feat-icon" style="background:linear-gradient(135deg,#0ea5e9,#0369a1)">📱</div>
+        <h3>Acesso Mobile</h3>
+      </div>
+      <p>Sistema 100% responsivo, funciona perfeitamente no celular pelo navegador ou como aplicativo nativo Android e iOS com Capacitor.</p>
+      <ul class="feat-list">
+        <li><span class="check">✓</span> Interface adaptada para mobile</li>
+        <li><span class="check">✓</span> App Android e iOS disponível</li>
+        <li><span class="check">✓</span> Navegação por ícones na base</li>
+        <li><span class="check">✓</span> Câmera integrada para fotos</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+<div class="divisor"></div>
+
+<!-- ══════════════════════════════════════════════
+     COMO FUNCIONA
+═══════════════════════════════════════════════ -->
+<div class="secao no-break">
+  <div class="secao-label">Como funciona</div>
+  <h2>Do chamado à conclusão em minutos</h2>
+  <p class="secao-sub">Um fluxo simples e intuitivo para toda a sua equipe</p>
+
+  <div class="steps">
+    <div class="step no-break">
+      <div class="step-num">01</div>
+      <h3>Configure as funções</h3>
+      <p>O administrador cria funções de manutenção personalizadas com nome, ícone e cor para cada tipo de serviço.</p>
+    </div>
+    <div class="step-arrow">›</div>
+    <div class="step no-break">
+      <div class="step-num">02</div>
+      <h3>Abra um chamado</h3>
+      <p>Selecione a função, adicione observações e atribua o chamado ao funcionário responsável com alguns toques.</p>
+    </div>
+    <div class="step-arrow">›</div>
+    <div class="step no-break">
+      <div class="step-num">03</div>
+      <h3>Acompanhe em tempo real</h3>
+      <p>O funcionário atualiza o status. O timer registra o tempo. Supervisores monitoram tudo ao vivo.</p>
+    </div>
+    <div class="step-arrow">›</div>
+    <div class="step no-break">
+      <div class="step-num">04</div>
+      <h3>Conclua e compartilhe</h3>
+      <p>Registro fica no histórico. Compartilhe via WhatsApp ou exporte relatório PDF com todos os detalhes.</p>
+    </div>
+  </div>
+</div>
+
+<div class="divisor"></div>
+
+<!-- ══════════════════════════════════════════════
+     EXTRAS
+═══════════════════════════════════════════════ -->
+<div class="secao no-break">
+  <div class="secao-label">Recursos adicionais</div>
+  <h2>Mais poder para sua operação</h2>
+  <p class="secao-sub">Recursos que fazem a diferença no dia a dia</p>
+
+  <div class="extras">
+    <div class="extra-card no-break">
+      <div class="extra-icon">💬</div>
+      <h3>Compartilhe via WhatsApp</h3>
+      <p>Envie resumos de chamados diretamente pelo WhatsApp. Mantenha clientes e gestores informados.</p>
+    </div>
+    <div class="extra-card no-break">
+      <div class="extra-icon">📄</div>
+      <h3>Exportação em PDF</h3>
+      <p>Gere relatórios profissionais de checklists e chamados com um clique, prontos para arquivamento.</p>
+    </div>
+    <div class="extra-card no-break">
+      <div class="extra-icon">⏱️</div>
+      <h3>Timer Automático</h3>
+      <p>Cada chamado registra automaticamente o tempo de início e fim para dados precisos de produtividade.</p>
+    </div>
+    <div class="extra-card no-break">
+      <div class="extra-icon">🔒</div>
+      <h3>Acesso por Perfil</h3>
+      <p>Controle granular de acesso. Cada perfil vê e faz apenas o que é permitido para seu nível.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     PERFIS DE ACESSO  (quebra de página)
+═══════════════════════════════════════════════ -->
+<div class="secao page-before">
+  <div class="secao-label">Perfis de acesso</div>
+  <h2>Hierarquia clara para cada função</h2>
+  <p class="secao-sub">3 perfis com permissões adequadas para cada papel na equipe</p>
+
+  <div class="perfis">
+
+    <div class="perfil-card no-break" style="background:#fffbeb;border-color:#FFD600;">
+      <div class="perfil-tag" style="background:rgba(255,214,0,0.15);color:#FF8F00;">👑 Master / Administrador</div>
+      <h3>Administrador</h3>
+      <p>Acesso completo ao sistema. Gerencia equipe, configurações e visualiza todos os chamados e relatórios.</p>
+      <ul class="perfil-list">
+        <li><span class="check">✓</span> Cria e edita funções de manutenção</li>
+        <li><span class="check">✓</span> Cadastra e gerencia funcionários</li>
+        <li><span class="check">✓</span> Visualiza todos os chamados</li>
+        <li><span class="check">✓</span> Acessa relatórios e analytics</li>
+        <li><span class="check">✓</span> Configura checklists e rotinas</li>
+        <li><span class="check">✓</span> Exporta dados em PDF</li>
+      </ul>
+    </div>
+
+    <div class="perfil-card no-break" style="background:#f0f9ff;border-color:#0ea5e9;">
+      <div class="perfil-tag" style="background:rgba(14,165,233,0.12);color:#0369a1;">🔍 Supervisor</div>
+      <h3>Supervisor</h3>
+      <p>Monitora a equipe, acompanha chamados em aberto e valida execuções sem poder alterar configurações.</p>
+      <ul class="perfil-list">
+        <li><span class="check">✓</span> Visualiza chamados da equipe</li>
+        <li><span class="check">✓</span> Monitora progresso dos checklists</li>
+        <li><span class="check">✓</span> Acompanha timers em andamento</li>
+        <li><span class="check">✓</span> Gera relatórios de desempenho</li>
+        <li><span class="check">✓</span> Valida conclusões de chamados</li>
+      </ul>
+    </div>
+
+    <div class="perfil-card no-break" style="background:#f0fdf4;border-color:#22c55e;">
+      <div class="perfil-tag" style="background:rgba(34,197,94,0.12);color:#15803d;">⚙️ Funcionário</div>
+      <h3>Funcionário</h3>
+      <p>Executa as tarefas atribuídas, atualiza status dos chamados e registra atividades no checklist.</p>
+      <ul class="perfil-list">
+        <li><span class="check">✓</span> Visualiza seus chamados atribuídos</li>
+        <li><span class="check">✓</span> Atualiza status das tarefas</li>
+        <li><span class="check">✓</span> Executa checklists atribuídos</li>
+        <li><span class="check">✓</span> Registra problemas com foto</li>
+        <li><span class="check">✓</span> Compartilha resumo via WhatsApp</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+<div class="divisor"></div>
+
+<!-- ══════════════════════════════════════════════
+     PARA QUEM
+═══════════════════════════════════════════════ -->
+<div class="secao no-break">
+  <div class="secao-label">Para quem</div>
+  <h2>Ideal para todos os setores que precisam de manutenção</h2>
+  <p class="secao-sub">Do prédio residencial à indústria — onde há manutenção, o Simples resolve</p>
+
+  <div class="setores">
+    <div class="setor-card no-break">
+      <span class="setor-emoji">🏢</span>
+      <h3>Condomínios</h3>
+      <p>Elevadores, bombas, portões e áreas comuns</p>
+    </div>
+    <div class="setor-card no-break">
+      <span class="setor-emoji">🏭</span>
+      <h3>Indústrias</h3>
+      <p>Ordens de serviço e manutenção preventiva</p>
+    </div>
+    <div class="setor-card no-break">
+      <span class="setor-emoji">🏥</span>
+      <h3>Hospitais</h3>
+      <p>Equipamentos críticos com rastreabilidade</p>
+    </div>
+    <div class="setor-card no-break">
+      <span class="setor-emoji">🏫</span>
+      <h3>Escolas</h3>
+      <p>Infraestrutura e manutenção predial</p>
+    </div>
+    <div class="setor-card no-break">
+      <span class="setor-emoji">🏨</span>
+      <h3>Hotéis</h3>
+      <p>Chamados de hóspedes com agilidade</p>
+    </div>
+    <div class="setor-card no-break">
+      <span class="setor-emoji">🏗️</span>
+      <h3>Construtoras</h3>
+      <p>Equipes de campo e checklists de obra</p>
+    </div>
+    <div class="setor-card no-break">
+      <span class="setor-emoji">🔧</span>
+      <h3>Prestadores</h3>
+      <p>Autônomos e empresas de manutenção</p>
+    </div>
+    <div class="setor-card no-break">
+      <span class="setor-emoji">🛒</span>
+      <h3>Comércio</h3>
+      <p>Lojas, supermercados e centros comerciais</p>
+    </div>
+    <div class="setor-card no-break">
+      <span class="setor-emoji">🔩</span>
+      <h3>Oficinas</h3>
+      <p>Ordens de serviço e histórico técnico</p>
+    </div>
+    <div class="setor-card destaque-setor no-break">
+      <span class="setor-emoji">🌐</span>
+      <h3>E muito mais...</h3>
+      <p>Atendemos todos os setores que precisam de manutenção — das mais simples às mais complexas</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     DIFERENCIAIS  (quebra de página)
+═══════════════════════════════════════════════ -->
+<div class="secao page-before">
+  <div class="secao-label">Nossos diferenciais</div>
+  <h2>Por que escolher o Simples Manutenção</h2>
+  <p class="secao-sub">Mais do que um software — uma solução completa para sua equipe</p>
+
+  <div class="diferenciais">
+    <div class="dif-card no-break">
+      <div class="dif-icon">⚡</div>
+      <div>
+        <h3>Implantação imediata</h3>
+        <p>Acesso em minutos, sem instalação. Funciona direto no navegador ou como app.</p>
+      </div>
+    </div>
+    <div class="dif-card no-break">
+      <div class="dif-icon">📱</div>
+      <div>
+        <h3>100% mobile</h3>
+        <p>Android e iOS nativos. Sua equipe usa no celular, em campo, sem precisar de computador.</p>
+      </div>
+    </div>
+    <div class="dif-card no-break">
+      <div class="dif-icon">🔒</div>
+      <div>
+        <h3>Dados protegidos (LGPD)</h3>
+        <p>Segurança e sigilo em conformidade com a LGPD. Seus dados pertencem a você.</p>
+      </div>
+    </div>
+    <div class="dif-card no-break">
+      <div class="dif-icon">📊</div>
+      <div>
+        <h3>Relatórios automáticos</h3>
+        <p>PDF completo de cada chamado com fotos, tempo e histórico de ações em um toque.</p>
+      </div>
+    </div>
+    <div class="dif-card no-break">
+      <div class="dif-icon">🕐</div>
+      <div>
+        <h3>Disponível 24/7</h3>
+        <p>Sistema online o tempo todo. Sem interrupções, sem surpresas, sempre acessível.</p>
+      </div>
+    </div>
+    <div class="dif-card no-break">
+      <div class="dif-icon">💬</div>
+      <div>
+        <h3>Suporte humanizado</h3>
+        <p>Atendimento real pelo WhatsApp em horário comercial, sem bots ou filas de espera.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="divisor"></div>
+
+<!-- ══════════════════════════════════════════════
+     PLANOS
+═══════════════════════════════════════════════ -->
+<div class="secao no-break">
+  <div class="secao-label">Investimento</div>
+  <h2>Planos e preços transparentes</h2>
+  <p class="secao-sub">Sem taxa de adesão. Sem surpresas. Cancele quando quiser.</p>
+
+  <div class="planos">
+
+    <div class="plano-card no-break">
+      <div class="plano-icon" style="background:linear-gradient(135deg,#FFD600,#FF8F00)">👤</div>
+      <h3>Individual</h3>
+      <p class="plano-desc">Ideal para uso pessoal ou autônomos.</p>
+      <div class="plano-preco">
+        <span class="plano-valor">R$ 99</span>
+        <span class="plano-periodo">/mês</span>
+      </div>
+      <p class="plano-detalhe">Acesso completo para 1 usuário.</p>
+      <ul class="plano-list">
+        <li><span class="check">✓</span> 1 usuário incluído</li>
+        <li><span class="check">✓</span> Chamados ilimitados</li>
+        <li><span class="check">✓</span> Checklists ilimitados</li>
+        <li><span class="check">✓</span> Relatórios em PDF</li>
+        <li><span class="check">✓</span> Acesso mobile (Android/iOS)</li>
+        <li><span class="check">✓</span> Suporte via WhatsApp</li>
+      </ul>
+    </div>
+
+    <div class="plano-card destaque no-break">
+      <div class="popular-badge">⭐ Mais popular</div>
+      <div class="plano-icon" style="background:linear-gradient(135deg,#0ea5e9,#0369a1)">👥</div>
+      <h3>Empresa</h3>
+      <p class="plano-desc">Perfeito para pequenas e médias equipes.</p>
+      <div class="plano-preco">
+        <span class="plano-valor">R$ 199</span>
+        <span class="plano-periodo">/mês</span>
+      </div>
+      <p class="plano-detalhe">Até 5 usuários incluídos.</p>
+      <ul class="plano-list">
+        <li><span class="check">✓</span> Até 5 usuários incluídos</li>
+        <li><span class="check">✓</span> Chamados ilimitados</li>
+        <li><span class="check">✓</span> Checklists ilimitados</li>
+        <li><span class="check">✓</span> Relatórios em PDF</li>
+        <li><span class="check">✓</span> Acesso mobile (Android/iOS)</li>
+        <li><span class="check">✓</span> Painel de gestão completo</li>
+        <li><span class="check">✓</span> Suporte prioritário</li>
+      </ul>
+    </div>
+
+    <div class="plano-card no-break">
+      <div class="plano-icon" style="background:linear-gradient(135deg,#a855f7,#7c3aed)">⚡</div>
+      <h3>Usuário Adicional</h3>
+      <p class="plano-desc">Para equipes acima de 5 usuários.</p>
+      <div class="plano-preco">
+        <span class="plano-valor">R$ 25</span>
+        <span class="plano-periodo">/mês por usuário</span>
+      </div>
+      <p class="plano-detalhe">Cada usuário extra custa R$ 25/mês.</p>
+      <ul class="plano-list">
+        <li><span class="check">✓</span> Adicione quantos precisar</li>
+        <li><span class="check">✓</span> Mesmo acesso do plano Empresa</li>
+        <li><span class="check">✓</span> Cobrado por usuário ativo</li>
+        <li><span class="check">✓</span> Ative e desative quando quiser</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+<div class="divisor"></div>
+
+<!-- ══════════════════════════════════════════════
+     EMPRESA
+═══════════════════════════════════════════════ -->
+<div class="secao no-break">
+  <div class="secao-label">Quem somos</div>
+  <h2>APP GROUP LTDA - ME</h2>
+  <p class="secao-sub">A empresa por trás do Simples Manutenção</p>
+
+  <div class="empresa-box">
+    <div>
+      <h2>Tecnologia que simplifica operações</h2>
+      <p style="margin-top:12px">
+        Empresa especializada em desenvolvimento de software SaaS para gestão operacional.
+        Fundada em 2023 em São Paulo, com foco em soluções simples e eficientes para
+        equipes de manutenção de todos os portes e segmentos.
+        Atendimento humanizado, suporte real e atualizações contínuas sem custo adicional.
+      </p>
+    </div>
+    <div class="empresa-dados">
+      <div class="dado">
+        <div class="dado-label">CNPJ</div>
+        <div class="dado-valor">51.797.070/0001-53</div>
+      </div>
+      <div class="dado">
+        <div class="dado-label">Fundação</div>
+        <div class="dado-valor">14/08/2023</div>
+      </div>
+      <div class="dado">
+        <div class="dado-label">Endereço</div>
+        <div class="dado-valor">Av. Paulista, 1106<br>Sala 01 — São Paulo/SP</div>
+      </div>
+      <div class="dado">
+        <div class="dado-label">Segmento</div>
+        <div class="dado-valor">Software SaaS &amp;<br>Hospedagem na Internet</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     CTA FINAL
+═══════════════════════════════════════════════ -->
+<div class="cta-final no-break">
+  <h2>Pronto para simplificar sua manutenção?</h2>
+  <p>Comece agora mesmo. Sem instalação, sem complicação — acesse direto pelo navegador ou baixe o app.</p>
+  <div class="cta-pills">
+    <span class="cta-pill">✅ Sem taxa de adesão</span>
+    <span class="cta-pill">📱 App Android &amp; iOS</span>
+    <span class="cta-pill">💬 Suporte via WhatsApp</span>
+    <span class="cta-pill">🔒 Dados protegidos (LGPD)</span>
+  </div>
+  <p class="cta-contato">
+    🌐 simplesmanutencao.com.br &nbsp;·&nbsp;
+    📞 (11) 93328-4364 &nbsp;·&nbsp;
+    💬 WhatsApp: (11) 93328-4364
+  </p>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     RODAPÉ
+═══════════════════════════════════════════════ -->
+<div class="rodape no-break">
+  © 2025 APP GROUP LTDA - ME · CNPJ 51.797.070/0001-53 · Av. Paulista, 1106, Sala 01 — Bela Vista, São Paulo/SP · CEP 01310-914
+</div>
+
+</body>
+</html>

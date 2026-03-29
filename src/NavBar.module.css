@@ -1,0 +1,158 @@
+/* ── Barra superior ──────────────────────────────────────────────────────── */
+.topBar {
+  background: linear-gradient(135deg, #FFD600 0%, #FF8F00 100%);
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 54px;
+  box-shadow: 0 2px 12px rgba(255,143,0,0.3);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 900;
+  font-size: 15px;
+  color: #0D0D0D;
+  white-space: nowrap;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+/* Botões de nav no topo (desktop) */
+.navBtns {
+  display: flex;
+  gap: 4px;
+  flex: 1;
+}
+
+.navBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(0,0,0,0.12);
+  color: #0D0D0D;
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.navBtn:hover { background: rgba(0,0,0,0.2); }
+.navBtnAtivo {
+  background: #0D0D0D !important;
+  color: #FFD600 !important;
+}
+
+.userArea {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.userName {
+  font-size: 12px;
+  font-weight: 700;
+  color: rgba(13,13,13,0.7);
+  white-space: nowrap;
+}
+
+.logoutBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(0,0,0,0.15);
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  color: #0D0D0D;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+/* ── Barra de navegação inferior (mobile) ───────────────────────────────── */
+.bottomNav {
+  display: none;
+}
+
+/* ── Espaço inferior para não cobrir conteúdo no mobile ─────────────────── */
+.bottomSpacer {
+  display: none;
+}
+
+/* ── Responsividade ─────────────────────────────────────────────────────── */
+@media (max-width: 620px) {
+  /* Esconde nav do topo no mobile */
+  .navBtns  { display: none; }
+  .userName { display: none; }
+  .logoutBtn span { display: none; } /* só ícone no logout */
+
+  /* Barra inferior visível no mobile */
+  .bottomNav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 62px;
+    background: linear-gradient(135deg, #FFD600 0%, #FF8F00 100%);
+    box-shadow: 0 -2px 16px rgba(255,143,0,0.35);
+    z-index: 200;
+    align-items: stretch;
+  }
+
+  .bottomBtn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-family: inherit;
+    color: rgba(13,13,13,0.6);
+    font-size: 10px;
+    font-weight: 800;
+    padding: 0 4px;
+    transition: all 0.15s;
+    position: relative;
+  }
+  .bottomBtn:hover { color: #0D0D0D; }
+  .bottomBtnAtivo {
+    color: #0D0D0D;
+  }
+  .bottomBtnAtivo::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 20%;
+    right: 20%;
+    height: 3px;
+    background: #0D0D0D;
+    border-radius: 3px 3px 0 0;
+  }
+  .bottomBtnLabel { font-size: 10px; font-weight: 800; line-height: 1; }
+
+  /* Espaço para não cobrir conteúdo com a barra inferior */
+  .bottomSpacer {
+    display: block;
+    height: 70px;
+    flex-shrink: 0;
+  }
+}

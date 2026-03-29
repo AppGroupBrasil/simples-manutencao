@@ -1,0 +1,180 @@
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.65);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 2000; padding: 16px;
+  backdrop-filter: blur(4px);
+}
+
+.modal {
+  background: #fff; border-radius: 24px;
+  width: 100%; max-width: 520px;
+  max-height: 92vh; display: flex; flex-direction: column;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.4);
+  overflow: hidden;
+}
+
+/* Header */
+.header {
+  background: linear-gradient(135deg, #dc2626, #991b1b);
+  padding: 20px 24px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.headerTitulo { display: flex; align-items: center; gap: 12px; }
+.alerta { font-size: 36px; }
+.headerTitulo h2 { margin: 0; font-size: 20px; font-weight: 900; color: #fff; }
+.itemTexto { margin: 3px 0 0; font-size: 13px; color: rgba(255,255,255,0.8); font-weight: 500; }
+.fechar {
+  background: rgba(0,0,0,0.25); border: none; border-radius: 50%;
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+  color: #fff; cursor: pointer; flex-shrink: 0;
+}
+.fechar:hover { background: rgba(255,255,255,0.35); }
+
+/* Corpo */
+.corpo {
+  flex: 1; overflow-y: auto; padding: 20px 24px;
+  display: flex; flex-direction: column; gap: 20px;
+}
+
+.secao { display: flex; flex-direction: column; gap: 8px; }
+.secaoLabelRow { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.secaoLabel {
+  font-size: 12px; font-weight: 800; color: #6b7280;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+
+.textarea {
+  padding: 12px 14px; border: 2px solid #e4e4e7; border-radius: 12px;
+  font-size: 14px; color: #111; font-family: inherit;
+  resize: vertical; outline: none; transition: border-color 0.2s;
+}
+.textarea:focus { border-color: #dc2626; }
+
+/* Fotos */
+.fotosGrid {
+  display: flex; flex-wrap: wrap; gap: 10px;
+}
+.fotoItem {
+  position: relative; width: 80px; height: 80px;
+}
+.fotoImg {
+  width: 100%; height: 100%; object-fit: cover;
+  border-radius: 10px; border: 2px solid #e4e4e7;
+}
+.fotoEditar {
+  position: absolute; top: -6px; left: -6px;
+  background: #7c3aed; border: none; border-radius: 50%;
+  width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+  color: #fff; cursor: pointer;
+  box-shadow: 0 2px 6px rgba(124,58,237,0.5);
+  transition: transform 0.15s;
+}
+.fotoEditar:hover { transform: scale(1.15); }
+
+.fotoRemover {
+  position: absolute; top: -6px; right: -6px;
+  background: #dc2626; border: none; border-radius: 50%;
+  width: 24px; height: 24px; display: flex; align-items: center; justify-content: center;
+  color: #fff; cursor: pointer;
+  box-shadow: 0 2px 6px rgba(220,38,38,0.4);
+  transition: transform 0.15s;
+}
+.fotoRemover:hover { transform: scale(1.15); }
+.fotoAdd {
+  width: 80px; height: 80px;
+  border: 2px dashed #d1d5db; border-radius: 10px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 4px; cursor: pointer; color: #9ca3af; font-size: 11px; font-weight: 700;
+  transition: all 0.2s;
+}
+.fotoAdd:hover { border-color: #dc2626; color: #dc2626; }
+
+/* Áudio */
+.erroAudio {
+  background: #fef2f2; border: 1px solid #fca5a5;
+  border-radius: 10px; padding: 10px 14px;
+  font-size: 13px; color: #b91c1c; font-weight: 700; margin: 0;
+}
+
+.audioControles { display: flex; flex-direction: column; gap: 10px; }
+
+.btnGravar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 20px;
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  border: none; border-radius: 14px;
+  color: #fff; font-size: 15px; font-weight: 800;
+  cursor: pointer; font-family: inherit;
+  transition: transform 0.15s;
+}
+.btnGravar:hover { transform: scale(1.02); }
+
+.gravando {
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 16px; background: #fef2f2; border-radius: 14px; border: 2px solid #fca5a5;
+}
+.gravandoPulse {
+  width: 14px; height: 14px; background: #dc2626; border-radius: 50%;
+  animation: pulse 1s infinite;
+  margin: 0 auto;
+}
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.4); opacity: 0.6; }
+}
+.gravandoTempo {
+  text-align: center; font-size: 20px; font-weight: 900;
+  font-family: monospace; color: #dc2626;
+}
+.progressBar {
+  height: 8px; background: #fee2e2; border-radius: 20px; overflow: hidden;
+}
+.progressFill {
+  height: 100%; background: #dc2626; border-radius: 20px;
+  transition: width 1s linear;
+}
+.btnParar {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 10px; background: #dc2626; border: none; border-radius: 10px;
+  color: #fff; font-size: 14px; font-weight: 800; cursor: pointer; font-family: inherit;
+}
+
+.audioPlayer {
+  display: flex; align-items: center; gap: 12px;
+  background: #f9fafb; border: 2px solid #e4e4e7; border-radius: 14px; padding: 12px 16px;
+}
+.btnPlay {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: #dc2626; border: none;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; cursor: pointer; flex-shrink: 0;
+}
+.audioInfo { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.audioLabel { font-size: 13px; font-weight: 700; color: #374151; }
+.audioDur { font-size: 12px; color: #9ca3af; font-family: monospace; }
+.btnRemoverAudio {
+  background: none; border: 1px solid #fca5a5; border-radius: 8px;
+  padding: 8px; color: #dc2626; cursor: pointer;
+  display: flex; align-items: center;
+}
+.btnRemoverAudio:hover { background: #fee2e2; }
+
+/* Rodapé */
+.rodape {
+  padding: 16px 24px; border-top: 1px solid #e4e4e7;
+  display: flex; gap: 10px; justify-content: flex-end;
+  background: #fafafa;
+}
+.btnCancelar {
+  padding: 10px 20px; background: none; border: 2px solid #e4e4e7;
+  border-radius: 10px; font-size: 14px; font-weight: 700;
+  cursor: pointer; color: #6b7280; font-family: inherit;
+}
+.btnSalvar {
+  display: flex; align-items: center; gap: 6px;
+  padding: 10px 24px; background: #dc2626; border: none;
+  border-radius: 10px; font-size: 14px; font-weight: 900;
+  color: #fff; cursor: pointer; font-family: inherit;
+}
+.btnSalvar:hover { background: #b91c1c; }

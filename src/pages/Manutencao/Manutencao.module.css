@@ -1,0 +1,899 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   TEMA: AMARELO FORTE + PRETO + BRANCO
+   Gradiente principal: #FFD600 → #FF8F00
+════════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --m-amarelo:      #FFD600;
+  --m-amarelo2:     #FF8F00;
+  --m-gradiente:    linear-gradient(135deg, #FFD600 0%, #FF8F00 100%);
+  --m-gradiente-r:  linear-gradient(135deg, #FF8F00 0%, #FFD600 100%);
+  --m-preto:        #0D0D0D;
+  --m-preto2:       #1A1A1A;
+  --m-branco:       #FFFFFF;
+  --m-sombra-ouro:  0 4px 20px rgba(255, 183, 0, 0.35);
+  --m-sombra-ouro2: 0 8px 32px rgba(255, 143, 0, 0.45);
+}
+
+/* ── Página ──────────────────────────────────────────────────────────────── */
+
+.page {
+  padding: 0 0 60px;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+/* ── Header principal ────────────────────────────────────────────────────── */
+
+.pageHeader {
+  background: var(--m-gradiente);
+  border-radius: 20px;
+  padding: 28px 28px 24px;
+  margin-bottom: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  box-shadow: var(--m-sombra-ouro2);
+  position: relative;
+  overflow: hidden;
+}
+
+.pageHeader::before {
+  content: '';
+  position: absolute;
+  top: -30px; right: -30px;
+  width: 120px; height: 120px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 50%;
+}
+
+.pageHeader::after {
+  content: '';
+  position: absolute;
+  bottom: -20px; left: 40%;
+  width: 80px; height: 80px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 50%;
+}
+
+.pageHeaderTitulo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  position: relative;
+  z-index: 1;
+}
+
+.pageHeaderIcone {
+  font-size: 44px;
+  filter: drop-shadow(0 2px 6px rgba(0,0,0,0.3));
+}
+
+.pageHeaderTexto h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 900;
+  color: var(--m-preto);
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+
+.pageHeaderTexto p {
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(13,13,13,0.65);
+}
+
+.badgeAtivos {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--m-preto);
+  color: var(--m-amarelo);
+  font-size: 12px;
+  font-weight: 800;
+  padding: 4px 12px;
+  border-radius: 20px;
+  margin-top: 6px;
+  letter-spacing: 0.3px;
+}
+
+/* ── Abas de navegação ───────────────────────────────────────────────────── */
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 28px;
+  background: var(--cor-superficie);
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid var(--cor-borda);
+  flex-wrap: wrap;
+}
+
+.tab {
+  flex: 1;
+  min-width: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--cor-texto-secundario);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab:hover {
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+}
+
+.tabAtivo {
+  background: var(--m-gradiente) !important;
+  color: var(--m-preto) !important;
+  box-shadow: var(--m-sombra-ouro);
+}
+
+/* ── Grid de tiles (tela do funcionário) ─────────────────────────────────── */
+
+.tilesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 21px;
+  margin-top: 20px;
+  margin-bottom: 36px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 32px 16px 24px;
+  border: none;
+  border-radius: 20px;
+  background: var(--m-gradiente);
+  color: var(--m-preto);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.2s;
+  box-shadow: var(--m-sombra-ouro);
+  aspect-ratio: 1 / 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.tile::before {
+  content: '';
+  position: absolute;
+  top: -20px; right: -20px;
+  width: 80px; height: 80px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 50%;
+  transition: transform 0.3s;
+}
+
+.tile:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--m-sombra-ouro2);
+}
+
+.tile:hover::before {
+  transform: scale(1.5);
+}
+
+.tile:active {
+  transform: scale(0.97);
+}
+
+/* Tile cor personalizada (override do gradiente) */
+.tileCustom {
+  background: var(--tile-bg, var(--m-gradiente)) !important;
+}
+
+.tileIcone {
+  font-size: 52px;
+  line-height: 1;
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,0.2));
+  position: relative;
+  z-index: 1;
+}
+
+.tileNome {
+  font-size: 16px;
+  font-weight: 900;
+  text-align: center;
+  line-height: 1.3;
+  letter-spacing: 0.2px;
+  position: relative;
+  z-index: 1;
+}
+
+.tileBotao {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 800;
+  background: rgba(0,0,0,0.15);
+  padding: 6px 14px;
+  border-radius: 20px;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  position: relative;
+  z-index: 1;
+  min-width: 100px;
+}
+
+/* ── Lixeira no tile + confirmação ───────────────────────────────────────── */
+
+.tileTrash {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.25);
+  border: 1.5px solid rgba(255,255,255,0.5);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2;
+  transition: background 0.2s, transform 0.15s;
+  padding: 0;
+}
+
+.tileTrash:hover {
+  background: rgba(220,38,38,0.8);
+  transform: scale(1.15);
+}
+
+.tileConfirmOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.82);
+  backdrop-filter: blur(4px);
+  border-radius: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  z-index: 5;
+  padding: 16px;
+}
+
+.tileConfirmTexto {
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.tileConfirmBtns {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+
+.tileConfirmSim {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 8px;
+  border: none;
+  border-radius: 12px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-family: inherit;
+}
+
+.tileConfirmSim:hover { background: #b91c1c; }
+
+.tileConfirmNao {
+  flex: 1;
+  padding: 10px 8px;
+  border: 1.5px solid rgba(255,255,255,0.4);
+  border-radius: 12px;
+  background: transparent;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.2s;
+  font-family: inherit;
+}
+
+.tileConfirmNao:hover { background: rgba(255,255,255,0.15); }
+
+/* ── Configurar Campos da OS ─────────────────────────────────────────────── */
+
+.osConfigOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 8000;
+}
+
+.osConfigModal {
+  background: var(--cor-superficie, #fff);
+  border-radius: 24px 24px 0 0;
+  padding: 24px 20px 32px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  animation: slideUpOS 0.3s ease;
+}
+
+@keyframes slideUpOS {
+  from { transform: translateY(100%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.osConfigHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  color: var(--cor-texto, #0D0D0D);
+}
+
+.osConfigTitulo {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.osConfigFechar {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: none;
+  background: var(--cor-fundo, #f3f4f6);
+  color: var(--cor-texto-secundario, #6b7280);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.osConfigFechar:hover { background: #e5e7eb; }
+
+.osConfigDesc {
+  font-size: 12px;
+  color: var(--cor-texto-secundario, #6b7280);
+  margin: 0 0 14px;
+  line-height: 1.5;
+}
+
+.osConfigLista {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding-right: 4px;
+}
+
+.osConfigItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border: 2px solid var(--cor-borda, #e4e4e7);
+  border-radius: 12px;
+  background: var(--cor-fundo, #f9fafb);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+  color: var(--cor-texto, #0D0D0D);
+}
+
+.osConfigItem:hover {
+  border-color: #0D47A1;
+}
+
+.osConfigItemOculto {
+  opacity: 0.45;
+  background: transparent !important;
+  border-style: dashed !important;
+}
+
+.osConfigItemInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.osConfigItemIcone {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.osConfigItemNome {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.osConfigEye {
+  color: #0D47A1;
+  flex-shrink: 0;
+}
+
+.osConfigEyeOff {
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.osConfigRestaurar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #FFD600;
+  border-radius: 12px;
+  background: rgba(255,214,0,0.1);
+  color: #FF8F00;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 12px;
+  font-family: inherit;
+}
+
+.osConfigRestaurar:hover {
+  background: rgba(255,214,0,0.25);
+  border-color: #FF8F00;
+}
+
+.osConfigRodape {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--cor-texto-secundario, #9ca3af);
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--cor-borda, #e4e4e7);
+}
+
+/* ── Botão Nova Função ───────────────────────────────────────────────────── */
+
+.btnNovaFuncao {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px 16px 24px;
+  border: none;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #FFD600 0%, #FF8F00 100%);
+  color: #0D0D0D;
+  cursor: pointer;
+  transition: all 0.2s;
+  height: 190px;
+  font-size: 16px;
+  font-weight: 900;
+  box-shadow: 0 4px 20px rgba(255, 183, 0, 0.35);
+}
+
+.btnNovaFuncao:hover {
+  background: linear-gradient(135deg, #FFE033 0%, #FFA020 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(255, 143, 0, 0.5);
+}
+
+.btnNovaFuncaoIcone {
+  opacity: 0.85;
+  color: #0D0D0D;
+}
+
+/* ── Seção ───────────────────────────────────────────────────────────────── */
+
+.secao {
+  margin-bottom: 32px;
+}
+
+.secaoTitulo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--cor-texto);
+  margin: 0 0 16px;
+}
+
+.secaoTituloIcone {
+  font-size: 22px;
+}
+
+/* ── Busca inteligente ───────────────────────────────────────────────────── */
+
+.buscaWrapper {
+  position: relative;
+  margin-bottom: 20px;
+}
+
+.buscaIcone {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px;
+  pointer-events: none;
+}
+
+.buscaInput {
+  width: 100%;
+  padding: 14px 44px 14px 48px;
+  border: 2px solid var(--cor-borda);
+  border-radius: 12px;
+  font-size: 15px;
+  color: var(--cor-texto);
+  background: var(--cor-superficie);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.buscaInput:focus {
+  border-color: var(--m-amarelo2);
+  box-shadow: 0 0 0 3px rgba(255, 183, 0, 0.2);
+}
+
+.buscaLimpar {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  border-radius: 50%;
+  transition: background 0.2s;
+  font-size: 18px;
+}
+
+.buscaLimpar:hover {
+  background: var(--cor-fundo);
+  color: var(--cor-texto);
+}
+
+/* ── Cards de chamado ────────────────────────────────────────────────────── */
+
+.chamadosList {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.chamadoCard {
+  background: var(--cor-superficie);
+  border: 2px solid var(--cor-borda);
+  border-left: 6px solid var(--m-amarelo2);
+  border-radius: 16px;
+  padding: 16px;
+  transition: box-shadow 0.2s;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+}
+
+.chamadoCard:hover {
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+.chamadoConcluido {
+  border-left-color: #2e7d32;
+  opacity: 0.75;
+}
+
+.chamadoHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chamadoTipo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chamadoIcone {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.chamadoNomeTipo {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--cor-texto);
+}
+
+.chamadoTimer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--m-preto);
+  background: var(--m-gradiente);
+  padding: 7px 16px;
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+  font-family: 'Courier New', monospace;
+  box-shadow: var(--m-sombra-ouro);
+}
+
+.chamadoTempoTotal {
+  font-size: 14px;
+  font-weight: 700;
+  color: #2e7d32;
+  background: #e8f5e9;
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-family: 'Courier New', monospace;
+}
+
+.chamadoInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--cor-borda);
+}
+
+.chamadoInfoItem {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chamadoInfoLabel {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--cor-texto-secundario);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  white-space: nowrap;
+}
+
+.chamadoInfoValor {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--cor-texto);
+}
+
+.chamadoAcoes {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+/* ── Botões de ação nos cards ────────────────────────────────────────────── */
+
+.btnAndamento {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border: none;
+  border-radius: 10px;
+  background: #2e7d32;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+  white-space: nowrap;
+}
+
+.btnAndamento:hover { opacity: 0.85; transform: translateY(-1px); }
+
+.statusAndamento {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #fff3e0;
+  color: #7a3500;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.btnConcluir {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border: none;
+  border-radius: 10px;
+  background: #dc2626;
+  color: white;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+  white-space: nowrap;
+}
+
+.btnConcluir:hover { opacity: 0.85; transform: translateY(-1px); }
+
+.btnExcluir {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 12px;
+  border: 1px solid var(--cor-borda);
+  border-radius: 10px;
+  background: transparent;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btnExcluir:hover {
+  background: #fee2e2;
+  border-color: #b91c1c;
+  color: #7f1d1d;
+}
+
+/* ── Botão primário amarelo ──────────────────────────────────────────────── */
+
+.btnPrimario {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px 28px;
+  border: none;
+  border-radius: 12px;
+  background: var(--m-gradiente);
+  color: var(--m-preto);
+  font-size: 16px;
+  font-weight: 900;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: var(--m-sombra-ouro);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.btnPrimario:hover:not(:disabled) {
+  box-shadow: var(--m-sombra-ouro2);
+  transform: translateY(-2px);
+}
+
+.btnPrimario:active { transform: scale(0.98); }
+
+.btnPrimario:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ── Estado vazio ────────────────────────────────────────────────────────── */
+
+.vazio {
+  text-align: center;
+  padding: 56px 20px;
+  color: var(--cor-texto-secundario);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.vazioIcone { font-size: 72px; opacity: 0.5; }
+
+.vazio p {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.vazio p:first-of-type {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--cor-texto);
+}
+
+/* ── Filtros de status ───────────────────────────────────────────────────── */
+
+.filtros {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.filtroBotao {
+  padding: 8px 16px;
+  border: 2px solid var(--cor-borda);
+  border-radius: 20px;
+  background: var(--cor-superficie);
+  color: var(--cor-texto-secundario);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filtroBotao:hover {
+  border-color: var(--m-amarelo2);
+  color: var(--m-amarelo2);
+}
+
+.filtroBotaoAtivo {
+  background: var(--m-gradiente) !important;
+  border-color: transparent !important;
+  color: var(--m-preto) !important;
+  box-shadow: var(--m-sombra-ouro);
+}
+
+/* ── Responsivo ──────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .tilesGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .tile {
+    aspect-ratio: 1 / 1;
+    padding: 24px 12px 18px;
+  }
+
+  .tileIcone { font-size: 40px; }
+  .tileNome  { font-size: 14px; }
+  .chamadoTimer { font-size: 17px; }
+  .pageHeaderTexto h1 { font-size: 22px; }
+  .tab { font-size: 12px; padding: 10px 12px; }
+}

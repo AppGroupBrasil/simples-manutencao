@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paletas de Cores — Funções Fixas</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: #08080a;
+    color: #fff;
+    padding: 32px 20px 100px;
+  }
+
+  h1 {
+    text-align: center;
+    font-size: 28px;
+    font-weight: 900;
+    margin-bottom: 6px;
+    background: linear-gradient(135deg, #a78bfa, #ec4899);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle { text-align: center; font-size: 14px; color: #666; margin-bottom: 48px; }
+
+  /* ── palette section ── */
+  .palette-section {
+    max-width: 960px;
+    margin: 0 auto 56px;
+    border: 1.5px solid #1a1a1f;
+    border-radius: 24px;
+    padding: 32px 28px;
+    background: #0e0e12;
+    position: relative;
+  }
+  .palette-section::before {
+    content: attr(data-label);
+    position: absolute;
+    top: -14px; left: 24px;
+    font-size: 13px; font-weight: 900;
+    padding: 5px 18px; border-radius: 20px;
+    letter-spacing: 0.5px;
+  }
+
+  .palette-desc { font-size: 13px; color: #666; margin-bottom: 20px; line-height: 1.5; }
+
+  /* color swatches row */
+  .swatches {
+    display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap;
+  }
+  .swatch {
+    width: 48px; height: 48px; border-radius: 14px;
+    display: flex; align-items: flex-end; justify-content: center;
+    padding-bottom: 4px;
+    font-size: 8px; font-weight: 700; color: rgba(255,255,255,0.7);
+    border: 1px solid rgba(255,255,255,0.06);
+    position: relative;
+    transition: transform 0.2s;
+  }
+  .swatch:hover { transform: scale(1.15); z-index: 2; }
+  .swatch-label { font-size: 9px; color: #555; font-weight: 700; align-self: center; }
+
+  /* mini preview (bento style) */
+  .mini-preview {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 12px;
+    border-radius: 16px;
+    padding: 20px;
+    background: #111115;
+  }
+
+  .mini-card {
+    border-radius: 16px;
+    padding: 18px 14px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s;
+    cursor: default;
+  }
+  .mini-card:hover { transform: translateY(-3px); }
+
+  .mini-card .mc-icon {
+    width: 36px; height: 36px; border-radius: 11px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    background: rgba(255,255,255,0.12);
+  }
+  .mini-card .mc-name { font-size: 13px; font-weight: 800; line-height: 1.3; }
+  .mini-card .mc-desc { font-size: 10px; opacity: 0.5; line-height: 1.3; }
+  .mini-card .mc-btn {
+    font-size: 9px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.8px; padding: 5px 12px; border-radius: 10px;
+    background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.08);
+    color: inherit; width: fit-content; margin-top: auto;
+  }
+  .mini-card .mc-stripe {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 3px; border-radius: 0 0 16px 16px;
+  }
+
+  /* second row */
+  .mini-preview-row2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 12px;
+  }
+
+  /* vote */
+  .vote-bar { display: flex; align-items: center; justify-content: center; gap: 12px; margin-top: 22px; }
+  .vote-btn {
+    padding: 10px 28px; border-radius: 12px;
+    border: 2px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04);
+    color: #aaa; font-size: 14px; font-weight: 800;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .vote-btn:hover {
+    background: rgba(255,255,255,0.1); color: #fff;
+    border-color: rgba(255,255,255,0.2); transform: scale(1.05);
+  }
+  .vote-btn.selected {
+    background: linear-gradient(135deg, var(--sel-c1, #a78bfa), var(--sel-c2, #ec4899)) !important;
+    color: #fff !important; border-color: transparent !important;
+    transform: scale(1.08); box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+  }
+
+  #resultado {
+    text-align: center; margin-top: 24px;
+    font-size: 16px; font-weight: 800;
+    color: #a78bfa; display: none;
+  }
+  #resultado.show { display: block; }
+
+  @media (max-width: 640px) {
+    .mini-preview { grid-template-columns: 1fr; }
+    .mini-preview-row2 { grid-template-columns: 1fr; }
+    .swatches { gap: 6px; }
+    .swatch { width: 40px; height: 40px; }
+  }
+
+  /* ══════════════════════════════════
+     PALETTE-SPECIFIC LABEL COLORS
+  ══════════════════════════════════ */
+  .pal-1::before { background: linear-gradient(135deg, #6366f1, #06b6d4); color: #fff; }
+  .pal-2::before { background: linear-gradient(135deg, #a78bfa, #ec4899); color: #fff; }
+  .pal-3::before { background: linear-gradient(135deg, #f59e0b, #ef4444); color: #fff; }
+  .pal-4::before { background: linear-gradient(135deg, #10b981, #3b82f6); color: #fff; }
+  .pal-5::before { background: linear-gradient(135deg, #f1f5f9, #94a3b8); color: #0f172a; }
+  .pal-6::before { background: linear-gradient(135deg, #fbbf24, #0ea5e9); color: #0a0a0a; }
+</style>
+</head>
+<body>
+
+<h1>Escolha a Paleta de Cores</h1>
+<p class="subtitle">Cada paleta será aplicada ao layout que você escolher. Passe o mouse nos cards!</p>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     PALETA 1 — OCEANO PROFUNDO
+══════════════════════════════════════════════════════════════════ -->
+<section class="palette-section pal-1" data-label="PALETA 1 — Oceano Profundo">
+  <p class="palette-desc">
+    Tons de azul profundo, índigo e ciano. Transmite confiança e profissionalismo. Fundo escuro com acentos vibrantes.
+  </p>
+  <div class="swatches">
+    <div class="swatch" style="background:#6366f1;">Índigo</div>
+    <div class="swatch" style="background:#4f46e5;">Violeta</div>
+    <div class="swatch" style="background:#0ea5e9;">Cyan</div>
+    <div class="swatch" style="background:#06b6d4;">Teal</div>
+    <div class="swatch" style="background:#1e293b;">Navy</div>
+    <div class="swatch" style="background:#0f172a;">Dark</div>
+    <div class="swatch" style="background:#22d3ee;">Aqua</div>
+    <span class="swatch-label">+ brancos e cinzas escuros</span>
+  </div>
+  <div class="mini-preview">
+    <!-- Personalizar (grande) -->
+    <div class="mini-card" style="background: linear-gradient(145deg, #6366f1, #4f46e5); color: #fff; grid-row: span 2;">
+      <div class="mc-icon" style="background:rgba(255,255,255,0.15);">➕</div>
+      <div class="mc-name">Personalizar Manutenção</div>
+      <div class="mc-desc">Crie campos e categorias personalizadas</div>
+      <div class="mc-btn" style="background:rgba(255,255,255,0.15);">+ Criar</div>
+    </div>
+    <!-- Manutenção Livre -->
+    <div class="mini-card" style="background: #0f172a; color: #22d3ee; border: 1px solid rgba(34,211,238,0.15);">
+      <div class="mc-icon" style="background:rgba(34,211,238,0.1);">📋</div>
+      <div class="mc-name">Manut. Livre</div>
+      <div class="mc-btn">+ Registrar</div>
+      <div class="mc-stripe" style="background:#22d3ee;"></div>
+    </div>
+    <!-- Checklist -->
+    <div class="mini-card" style="background: linear-gradient(145deg, #0ea5e9, #0284c7); color: #fff;">
+      <div class="mc-icon">📝</div>
+      <div class="mc-name">Checklist</div>
+      <div class="mc-btn">+ Acessar</div>
+      <div class="mc-stripe" style="background:#67e8f9;"></div>
+    </div>
+    <!-- Ordem de Serviço -->
+    <div class="mini-card" style="background: linear-gradient(145deg, #1e293b, #0f172a); color: #94a3b8; border: 1px solid rgba(99,102,241,0.15);">
+      <div class="mc-icon" style="background:rgba(99,102,241,0.12); color:#a5b4fc;">📋</div>
+      <div class="mc-name" style="color:#a5b4fc;">Ordem de Serviço</div>
+      <div class="mc-btn">+ Abrir</div>
+      <div class="mc-stripe" style="background:#6366f1;"></div>
+    </div>
+    <!-- Funcionários -->
+    <div class="mini-card" style="background: linear-gradient(145deg, #06b6d4, #0891b2); color: #fff;">
+      <div class="mc-icon">👥</div>
+      <div class="mc-name">Funcionários</div>
+      <div class="mc-btn">+ Acessar</div>
+      <div class="mc-stripe" style="background:#a5f3fc;"></div>
+    </div>
+  </div>
+  <div class="vote-bar">
+    <button class="vote-btn" style="--sel-c1:#6366f1;--sel-c2:#06b6d4;" onclick="vote(1, this)">⭐ Votar Paleta 1</button>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     PALETA 2 — NEON AURORA
+══════════════════════════════════════════════════════════════════ -->
+<section class="palette-section pal-2" data-label="PALETA 2 — Neon Aurora">
+  <p class="palette-desc">
+    Roxo vibrante, magenta e rosa com acentos neon. Visual futurista e energético. Perfeito para apps modernos.
+  </p>
+  <div class="swatches">
+    <div class="swatch" style="background:#a78bfa;">Lilás</div>
+    <div class="swatch" style="background:#8b5cf6;">Roxo</div>
+    <div class="swatch" style="background:#ec4899;">Pink</div>
+    <div class="swatch" style="background:#f43f5e;">Rose</div>
+    <div class="swatch" style="background:#c026d3;">Magenta</div>
+    <div class="swatch" style="background:#1a1025;">Dark</div>
+    <div class="swatch" style="background:#e879f9;">Orchid</div>
+    <span class="swatch-label">+ fundos roxo-escuro</span>
+  </div>
+  <div class="mini-preview">
+    <div class="mini-card" style="background: linear-gradient(145deg, #8b5cf6, #7c3aed); color: #fff; grid-row: span 2;">
+      <div class="mc-icon" style="background:rgba(255,255,255,0.15);">➕</div>
+      <div class="mc-name">Personalizar Manutenção</div>
+      <div class="mc-desc">Crie campos e categorias</div>
+      <div class="mc-btn" style="background:rgba(255,255,255,0.15);">+ Criar</div>
+    </div>
+    <div class="mini-card" style="background: #1a1025; color: #e879f9; border: 1px solid rgba(232,121,249,0.15);">
+      <div class="mc-icon" style="background:rgba(232,121,249,0.1);">📋</div>
+      <div class="mc-name">Manut. Livre</div>
+      <div class="mc-btn">+ Registrar</div>
+      <div class="mc-stripe" style="background:#e879f9;"></div>
+    </div>
+    <div class="mini-card" style="background: linear-gradient(145deg, #ec4899, #db2777); color: #fff;">
+      <div class="mc-icon">📝</div>
+      <div class="mc-name">Checklist</div>
+      <div class="mc-btn">+ Acessar</div>
+      <div class="mc-stripe" style="background:#fbcfe8;"></div>
+    </div>
+    <div class="mini-card" style="background: linear-gradient(145deg, #1a1025, #0f0815); color: #c4b5fd; border: 1px solid rgba(139,92,246,0.12);">
+      <div class="mc-icon" style="background:rgba(139,92,246,0.12);">📋</div>
+      <div class="mc-name">Ordem de Serviço</div>
+      <div class="mc-btn">+ Abrir</div>
+      <div class="mc-stripe" style="background:#a78bfa;"></div>
+    </div>
+    <div class="mini-card" style="background: linear-gradient(145deg, #c026d3, #a21caf); color: #fff;">
+      <div class="mc-icon">👥</div>
+      <div class="mc-name">Funcionários</div>
+      <div class="mc-btn">+ Acessar</div>
+      <div class="mc-stripe" style="background:#f0abfc;"></div>
+    </div>
+  </div>
+  <div class="vote-bar">
+    <button class="vote-btn" style="--sel-c1:#a78bfa;--sel-c2:#ec4899;" onclick="vote(2, this)">⭐ Votar Paleta 2</button>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     PALETA 3 — TERRA & FOGO
+══════════════════════════════════════════════════════════════════ -->
+<section class="palette-section pal-3" data-label="PALETA 3 — Terra & Fogo">
+  <p class="palette-desc">
+    Tons quentes: âmbar, terracota, laranja-queimado e vermelho. Sensação de energia e urgência. Forte presença visual.
+  </p>
+  <div class="swatches">
+    <div class="swatch" style="background:#f59e0b;">Âmbar</div>
+    <div class="swatch" style="background:#d97706;">Dourado</div>
+    <div class="swatch" style="background:#ef4444;">Vermelho</div>
+    <div class="swatch" style="background:#dc2626;">Rubi</div>
+    <div class="swatch" style="background:#ea580c;">Laranja</div>
+    <div class="swatch" style="background:#1c1210;">Dark</div>
+    <div class="swatch" style="background:#fbbf24;">Gold</div>
+    <span class="swatch-label">+ castanhos escuros</span>
+  </div>
+  <div class="mini-preview">
+    <div class="mini-card" style="background: linear-gradient(145deg, #f59e0b, #d97706); color: #1c1210; grid-row: span 2;">
+      <div class="mc-icon" style="background:rgba(0,0,0,0.12); color:#1c1210;">➕</div>
+      <div class="mc-name">Personalizar Manutenção</div>
+      <div class="mc-desc" style="color:rgba(0,0,0,0.45);">Crie campos e categorias</div>
+      <div class="mc-btn" style="background:rgba(0,0,0,0.12); color:#1c1210; border-color:rgba(0,0,0,0.08);">+ Criar</div>
+    </div>
+    <div class="mini-card" style="background: #1c1210; color: #fbbf24; border: 1px solid rgba(251,191,36,0.15);">
+      <div class="mc-icon" style="background:rgba(251,191,36,0.1);">📋</div>
+      <div class="mc-name">Manut. Livre</div>
+      <div class="mc-btn">+ Registrar</div>
+      <div class="mc-stripe" style="background:#fbbf24;"></div>
+    </div>
+    <div class="mini-card" style="background: linear-gradient(145deg, #ef4444, #dc2626); color: #fff;">
+      <div class="mc-icon">📝</div>
+      <div class="mc-name">Checklist</div>
+      <div class="mc-btn">+ Acessar</div>
+      <div class="mc-stripe" style="background:#fca5a5;"></div>
+    </div>
+    <div class="mini-card" style="background: linear-gradient(145deg, #1c1210, #120c0a); color: #f59e0b; border: 1px solid rgba(245,158,11,0.12);">
+      <div class="mc-icon" style="background:rgba(245,158,11,0.1);">📋</div>
+      <div class="mc-name">Ordem de Serviço</div>
+      <div class="mc-btn">+ Abrir</div>
+      <div class="mc-stripe" style="background:#ea580c;"></div>
+    </div>
+    <div class="mini-card" style="background: linear-gradient(145deg, #ea580c, #c2410c); color: #fff;">
+      <div class="mc-icon">👥</div>
+      <div class="mc-name">Funcionários</div>
+      <div class="mc-btn">+ Acessar</div>
+      <div class="mc-stripe" style="background:#fdba74;"></div>
+    </div>
+  </div>
+  <div class="vote-bar">
+    <button class="vote-btn" style="--sel-c1:#f59e0b;--sel-c2:#ef4444;" onclick="vote(3, this)">⭐ Votar Paleta 3</button>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     PALETA 4 — ESMERALDA & SAFIRA
+══════════════════════════════════════════════════════════════════ -->
+<section class="palette-section pal-4" data-label="PALETA 4 — Esmeralda & Safira">
+  <p class="palette-desc">
+    Verde esmeralda com azul safira. Natureza + tecnologia. Combinação harmoniosa, corporativa e elegante.
+  </p>
+  <div class="swatches">
+    <div class="swatch" style="background:#10b981;">Esmeralda</div>
+    <div class="swatch" style="background:#059669;">Verde</div>
+    <div class="swatch" style="background:#3b82f6;">Safira</div>
+    <div class="swatch" style="background:#2563eb;">Azul</div>
+    <div class="swatch" style="background:#14b8a6;">Teal</div>
+    <div class="swatch" style="background:#0a1a14;">Dark</div>
+    <div class="swatch" style="background:#34d399;">Menta</div>
+    <span class="swatch-label">+ fundos verde-escuro</span>
+  </div>
+  <div class="mini-preview">
+    <div class="mini-card" style="background: linear-gradient(145deg, #10b981, #059669); color: #fff; grid-row: span 2;">
+      <div class="mc-icon" style="background:rgba(255,255,255,0.15);">➕</div>
+      <div class="mc-name">Personalizar Manutenção</div>
+      <div class="mc-desc">Crie campos e categorias</div>
+      <div class="mc-btn" style="background:rgba(255,255,255,0.15);">+ Criar</div>
+    </div>
+    <div class="mini-card" style="background: #0a1a14; color: #34d399; border: 1px solid rgba(52,211,153,0.15);">
+      <div class="mc-icon" style="background:rgba(52,211,153,0.1);">📋</div>
+      <div class="mc-name">Manut. Livre</div>
+      <div class="mc-btn">+ Registrar</div>
+      <div class="mc-stripe" style="background:#34d399;"></div>
+    </div>
+    <div class="mini-card" style="background: linear-gradient(145deg, #3b82f6, #2563eb); color: #fff;">
+      <div class="mc-icon">📝</div>
+      <div class="mc-name">Checklist</div>
+      <div class="mc-btn">+ Acessar</div>
+      <div class="mc-stripe" style="background:#93c5fd;"></div>
+    </div>
+    <div class="mini-card" style="background: linear-gradient(145deg, #0f1f1a, #0a1510); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.1);">
+      <div class="mc-icon" style="background:rgba(16,185,129,0.1);">📋</div>
+      <div class="mc-name">Ordem de Serviço</div>
+      <div class="mc-btn">+ Abrir</div>
+      <div class="mc-stripe" style="background:#10b981;"></div>
+    </div>
+    <div class="mini-card" style="background: linear-gradient(145deg, #14b8a6, #0d9488); color: #fff;">
+      <div class="mc-icon">👥</div>
+      <div class="mc-name">Funcionários</div>
+      <div class="mc-btn">+ Acessar</div>
+      <div class="mc-stripe" style="background:#99f6e4;"></div>
+    </div>
+  </div>
+  <div class="vote-bar">
+    <button class="vote-btn" style="--sel-c1:#10b981;--sel-c2:#3b82f6;" onclick="vote(4, this)">⭐ Votar Paleta 4</button>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     PALETA 5 — OBSIDIAN (MONOCROMÁTICO)
+══════════════════════════════════════════════════════════════════ -->
+<section class="palette-section pal-5" data-label="PALETA 5 — Obsidian (Mono)">
+  <p class="palette-desc">
+    Monocromático sofisticado: cinzas, pratas e brancos sobre preto absoluto. Ultra-minimalista e premium. Inspirado no design da Apple.
+  </p>
+  <div class="swatches">
+    <div class="swatch" style="background:#f8fafc; color:#333;">Branco</div>
+    <div class="swatch" style="background:#cbd5e1;">Prata</div>
+    <div class="swatch" style="background:#64748b;">Slate</div>
+    <div class="swatch" style="background:#334155;">Steel</div>
+    <div class="swatch" style="background:#1e293b;">Grafite</div>
+    <div class="swatch" style="background:#0f172a;">Onyx</div>
+    <div class="swatch" style="background:#e2e8f0;">Platina</div>
+    <span class="swatch-label">+ sem cores de destaque</span>
+  </div>
+  <div class="mini-preview">
+    <div class="mini-card" style="background: linear-gradient(145deg, #f1f5f9, #cbd5e1); color: #0f172a; grid-row: span 2;">
+      <div class="mc-icon" style="background:rgba(0,0,0,0.08); color:#0f172a;">➕</div>
+      <div class="mc-name">Personalizar Manutenção</div>
+      <div class="mc-desc" style="color:rgba(0,0,0,0.4);">Crie campos e categorias</div>
+      <div class="mc-btn" style="background:rgba(0,0,0,0.08); color:#0f172a; border-color:rgba(0,0,0,0.06);">+ Criar</div>
+    </div>
+    <div class="mini-card" style="background: #0f172a; color: #e2e8f0; border: 1px solid rgba(226,232,240,0.1);">
+      <div class="mc-icon" style="background:rgba(226,232,240,0.06);">📋</div>
+      <div class="mc-name">Manut. Livre</div>
+      <div class="mc-btn">+ Registrar</div>
+      <div class="mc-stripe" style="background:#94a3b8;"></div>
+    </div>
+    <div class="mini-card" style="background: linear-gradient(145deg, #334155, #1e293b); color: #e2e8f0;">
+      <div class="mc-icon" style="background:rgba(255,255,255,0.08);">📝</div>
+      <div class="mc-name">Checklist</div>
+      <div class="mc-btn">+ Acessar</div>
+      <div class="mc-stripe" style="background:#94a3b8;"></div>
+    </div>
+    <div class="mini-card" style="background: #1e293b; color: #94a3b8; border: 1px solid rgba(148,163,184,0.08);">
+      <div class="mc-icon" style="background:rgba(148,163,184,0.08);">📋</div>
+      <div class="mc-name" style="color:#cbd5e1;">Ordem de Serviço</div>
+      <div class="mc-btn">+ Abrir</div>
+      <div class="mc-stripe" style="background:#64748b;"></div>
+    </div>
+    <div class="mini-card" style="background: linear-gradient(145deg, #64748b, #475569); color: #fff;">
+      <div class="mc-icon" style="background:rgba(255,255,255,0.12);">👥</div>
+      <div class="mc-name">Funcionários</div>
+      <div class="mc-btn">+ Acessar</div>
+      <div class="mc-stripe" style="background:#cbd5e1;"></div>
+    </div>
+  </div>
+  <div class="vote-bar">
+    <button class="vote-btn" style="--sel-c1:#94a3b8;--sel-c2:#f1f5f9;" onclick="vote(5, this)">⭐ Votar Paleta 5</button>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     PALETA 6 — SUNRISE (AZUL + AMARELO)
+══════════════════════════════════════════════════════════════════ -->
+<section class="palette-section pal-6" data-label="PALETA 6 — Sunrise (Azul + Dourado)">
+  <p class="palette-desc">
+    Mescla entre azul céu e dourado — como um nascer do sol. Mantém a energia do amarelo atual mas com mais sofisticação através do azul. Equilíbrio ideal.
+  </p>
+  <div class="swatches">
+    <div class="swatch" style="background:#fbbf24; color:#333;">Dourado</div>
+    <div class="swatch" style="background:#f59e0b; color:#333;">Âmbar</div>
+    <div class="swatch" style="background:#0ea5e9;">Sky</div>
+    <div class="swatch" style="background:#0284c7;">Cerúleo</div>
+    <div class="swatch" style="background:#0c4a6e;">Deep</div>
+    <div class="swatch" style="background:#0c1220;">Dark</div>
+    <div class="swatch" style="background:#38bdf8;">Light</div>
+    <span class="swatch-label">+ contraste dourado-azul</span>
+  </div>
+  <div class="mini-preview">
+    <div class="mini-card" style="background: linear-gradient(145deg, #fbbf24, #f59e0b); color: #0c1220; grid-row: span 2;">
+      <div class="mc-icon" style="background:rgba(0,0,0,0.1); color:#0c1220;">➕</div>
+      <div class="mc-name">Personalizar Manutenção</div>
+      <div class="mc-desc" style="color:rgba(0,0,0,0.4);">Crie campos e categorias</div>
+      <div class="mc-btn" style="background:rgba(0,0,0,0.12); color:#0c1220; border-color:rgba(0,0,0,0.08);">+ Criar</div>
+    </div>
+    <div class="mini-card" style="background: #0c1220; color: #fbbf24; border: 1px solid rgba(251,191,36,0.15);">
+      <div class="mc-icon" style="background:rgba(251,191,36,0.08);">📋</div>
+      <div class="mc-name">Manut. Livre</div>
+      <div class="mc-btn">+ Registrar</div>
+      <div class="mc-stripe" style="background:#fbbf24;"></div>
+    </div>
+    <div class="mini-card" style="background: linear-gradient(145deg, #0ea5e9, #0284c7); color: #fff;">
+      <div class="mc-icon">📝</div>
+      <div class="mc-name">Checklist</div>
+      <div class="mc-btn">+ Acessar</div>
+      <div class="mc-stripe" style="background:#7dd3fc;"></div>
+    </div>
+    <div class="mini-card" style="background: linear-gradient(145deg, #0c4a6e, #0c1a30); color: #7dd3fc; border: 1px solid rgba(14,165,233,0.1);">
+      <div class="mc-icon" style="background:rgba(14,165,233,0.1);">📋</div>
+      <div class="mc-name">Ordem de Serviço</div>
+      <div class="mc-btn">+ Abrir</div>
+      <div class="mc-stripe" style="background:#0ea5e9;"></div>
+    </div>
+    <div class="mini-card" style="background: linear-gradient(145deg, #38bdf8, #0ea5e9); color: #0c1220;">
+      <div class="mc-icon" style="background:rgba(0,0,0,0.1);">👥</div>
+      <div class="mc-name">Funcionários</div>
+      <div class="mc-btn" style="background:rgba(0,0,0,0.1); border-color:rgba(0,0,0,0.08); color:#0c1220;">+ Acessar</div>
+      <div class="mc-stripe" style="background:#fbbf24;"></div>
+    </div>
+  </div>
+  <div class="vote-bar">
+    <button class="vote-btn" style="--sel-c1:#fbbf24;--sel-c2:#0ea5e9;" onclick="vote(6, this)">⭐ Votar Paleta 6</button>
+  </div>
+</section>
+
+<div id="resultado"></div>
+
+<script>
+  function vote(n, btn) {
+    document.querySelectorAll('.vote-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    const el = document.getElementById('resultado');
+    el.textContent = '✓ Paleta ' + n + ' selecionada! Diga o número no chat para eu aplicar.';
+    el.className = 'show';
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+</script>
+
+</body>
+</html>

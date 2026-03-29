@@ -1,0 +1,34 @@
+http:
+  routers:
+    www-simples-http:
+      entryPoints:
+        - http
+      rule: "Host(`www.simplesmanutencao.com.br`)"
+      middlewares:
+        - www-simples-redirect
+      service: simples-manutencao-svc
+      priority: 100
+
+    www-simples-https:
+      entryPoints:
+        - https
+      rule: "Host(`www.simplesmanutencao.com.br`)"
+      middlewares:
+        - www-simples-redirect
+      service: simples-manutencao-svc
+      tls:
+        certResolver: letsencrypt
+      priority: 100
+
+  middlewares:
+    www-simples-redirect:
+      redirectRegex:
+        regex: "^https?://www\\.simplesmanutencao\\.com\\.br/(.*)"
+        replacement: "https://simplesmanutencao.com.br/${1}"
+        permanent: true
+
+  services:
+    simples-manutencao-svc:
+      loadBalancer:
+        servers:
+          - url: "http://simples-manutencao:80"

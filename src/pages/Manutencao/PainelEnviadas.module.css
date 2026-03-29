@@ -1,0 +1,255 @@
+.painel { display: flex; flex-direction: column; gap: 16px; }
+
+/* ── Título ──────────────────────────────────────────────────────────────── */
+.painelTitulo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.painelIcone { font-size: 36px; }
+.painelH2 { margin: 0; font-size: 22px; font-weight: 900; color: var(--cor-texto); }
+.painelSubtitulo { margin: 3px 0 0; font-size: 13px; color: var(--cor-texto-secundario); font-weight: 500; }
+
+/* ── Busca ───────────────────────────────────────────────────────────────── */
+.buscaWrapper { position: relative; }
+.buscaIcone {
+  position: absolute;
+  left: 16px; top: 50%;
+  transform: translateY(-50%);
+  font-size: 18px;
+  pointer-events: none;
+}
+.buscaInput {
+  width: 100%;
+  padding: 14px 44px 14px 50px;
+  border: 2px solid var(--cor-borda);
+  border-radius: 12px;
+  font-size: 15px;
+  color: var(--cor-texto);
+  background: var(--cor-superficie);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+.buscaInput:focus {
+  border-color: #FF8F00;
+  box-shadow: 0 0 0 3px rgba(255,143,0,0.2);
+}
+.buscaLimpar {
+  position: absolute;
+  right: 12px; top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  border-radius: 50%;
+}
+.buscaLimpar:hover { background: var(--cor-fundo); }
+
+/* ── Filtros ─────────────────────────────────────────────────────────────── */
+.filtrosBar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.filtroBotao {
+  padding: 8px 16px;
+  border: 2px solid var(--cor-borda);
+  border-radius: 20px;
+  background: var(--cor-superficie);
+  color: var(--cor-texto-secundario);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.filtroBotao:hover { border-color: #FF8F00; color: #FF8F00; }
+.filtroBotaoAtivo {
+  background: linear-gradient(135deg, #FFD600, #FF8F00) !important;
+  border-color: transparent !important;
+  color: #0D0D0D !important;
+  box-shadow: 0 3px 10px rgba(255,183,0,0.35);
+}
+
+/* ── Vazio ───────────────────────────────────────────────────────────────── */
+.vazio {
+  text-align: center;
+  padding: 56px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: var(--cor-texto-secundario);
+}
+.vazioIcone { font-size: 64px; opacity: 0.5; }
+.vazio p { margin: 0; font-size: 17px; font-weight: 600; }
+
+/* ── Lista de cards ──────────────────────────────────────────────────────── */
+.lista { display: flex; flex-direction: column; gap: 10px; }
+
+.card {
+  border: 1px solid var(--cor-borda);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+}
+.card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+
+.cardHeader {
+  width: 100%;
+  padding: 16px 18px;
+  background: var(--cor-superficie);
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cardHeader:hover { background: var(--cor-fundo); }
+
+.cardTopo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.cardTipo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cardIcone { font-size: 26px; }
+.cardNomeTipo { font-size: 16px; font-weight: 900; color: var(--cor-texto); }
+.cardData { font-size: 12px; color: var(--cor-texto-secundario); font-weight: 500; margin-top: 2px; }
+
+.cardDireita {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.statusBadge {
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 12px;
+  border-radius: 20px;
+  letter-spacing: 0.3px;
+}
+
+.expandirIcone { font-size: 12px; color: var(--cor-texto-secundario); }
+
+.cardInfo {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.cardInfoItem {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cor-texto-secundario);
+}
+
+/* ── Detalhes expandidos ─────────────────────────────────────────────────── */
+.cardDetalhes {
+  padding: 16px 18px;
+  background: var(--cor-fundo);
+  border-top: 1px solid var(--cor-borda);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.detalheGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.detalheItem {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: var(--cor-superficie);
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+
+.detalheLabel {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--cor-texto-secundario);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.detalheValor {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--cor-texto);
+}
+
+/* ── Respostas ───────────────────────────────────────────────────────────── */
+.respostas {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.respostasLabel {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--cor-texto-secundario);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 4px;
+}
+
+.respostaItem {
+  padding: 8px 12px;
+  background: var(--cor-superficie);
+  border-radius: 8px;
+  border-left: 3px solid #FFD600;
+}
+
+.respostaValor {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--cor-texto);
+}
+
+/* ── Ações do card ───────────────────────────────────────────────────────── */
+.cardAcoes { display: flex; justify-content: flex-end; }
+
+.btnExcluir {
+  padding: 8px 16px;
+  border: 1px solid var(--cor-borda);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cor-texto-secundario);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btnExcluir:hover {
+  background: #fee2e2;
+  border-color: #b91c1c;
+  color: #7f1d1d;
+}

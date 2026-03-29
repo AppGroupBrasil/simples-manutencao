@@ -1,0 +1,251 @@
+/* ── Botão flutuante ? ── */
+.btnAjuda {
+  position: fixed;
+  bottom: 100px;
+  right: 20px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #FFD600, #FF8F00);
+  border: none;
+  cursor: pointer;
+  font-size: 22px;
+  font-weight: 900;
+  color: #0D0D0D;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 20px rgba(255,183,0,0.5);
+  z-index: 500;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btnAjuda:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 28px rgba(255,183,0,0.6);
+}
+
+@media (min-width: 621px) {
+  .btnAjuda { bottom: 28px; }
+}
+
+/* ── Overlay ── */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(3px);
+  z-index: 600;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 0;
+}
+
+@media (min-width: 621px) {
+  .overlay {
+    align-items: center;
+    padding: 20px;
+  }
+}
+
+/* ── Painel ── */
+.painel {
+  background: var(--cor-superficie, #fff);
+  width: 100%;
+  max-width: 420px;
+  border-radius: 24px 24px 0 0;
+  padding: 28px 24px 36px;
+  box-shadow: 0 -8px 40px rgba(0,0,0,0.2);
+  max-height: 85vh;
+  overflow-y: auto;
+  animation: slideUp 0.25s ease;
+}
+
+@media (min-width: 621px) {
+  .painel {
+    border-radius: 24px;
+    max-height: 80vh;
+    animation: slideIn 0.25s ease;
+  }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(40px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { transform: translateX(40px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+
+/* ── Cabeçalho painel ── */
+.painelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.painelTitulo {
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--cor-texto, #0D0D0D);
+  margin: 0;
+}
+
+.btnFechar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: var(--cor-borda, #e4e4e7);
+  color: var(--cor-texto, #0D0D0D);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.btnFechar:hover { background: #d4d4d8; }
+
+/* ── Seção ── */
+.secao {
+  margin-bottom: 24px;
+}
+
+.secaoTitulo {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--cor-texto-secundario, #71717a);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin: 0 0 12px;
+}
+
+/* ── Passos checklist ── */
+.passo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 2px solid var(--cor-borda, #e4e4e7);
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-decoration: none;
+  color: inherit;
+}
+
+.passo:hover {
+  border-color: #FFD600;
+  background: #fffbeb;
+}
+
+.passoConcluido {
+  border-color: #86efac;
+  background: #f0fdf4;
+  cursor: default;
+}
+
+.passoConcluido:hover {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.passoCheck {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--cor-borda, #e4e4e7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex-shrink: 0;
+  transition: all 0.2s;
+}
+
+.passoCheckFeito {
+  background: #22c55e;
+  color: #fff;
+}
+
+.passoInfo { flex: 1; }
+
+.passoTitulo {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--cor-texto, #0D0D0D);
+  margin: 0 0 2px;
+}
+
+.passoConcluido .passoTitulo {
+  color: #15803d;
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.passoDesc {
+  font-size: 12px;
+  color: var(--cor-texto-secundario, #71717a);
+  margin: 0;
+}
+
+.passoEmoji { font-size: 18px; flex-shrink: 0; }
+
+/* ── Progresso ── */
+.progressoWrap {
+  background: var(--cor-borda, #e4e4e7);
+  border-radius: 99px;
+  height: 6px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.progressoBarra {
+  height: 100%;
+  background: linear-gradient(90deg, #FFD600, #FF8F00);
+  border-radius: 99px;
+  transition: width 0.4s ease;
+}
+
+.progressoLabel {
+  font-size: 12px;
+  color: var(--cor-texto-secundario, #71717a);
+  margin-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* ── Dicas da página ── */
+.dica {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: var(--cor-borda, #f4f4f5);
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--cor-texto, #0D0D0D);
+  line-height: 1.5;
+}
+
+/* ── Badge completo ── */
+.badgeCompleto {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #dcfce7;
+  color: #15803d;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+  margin-bottom: 12px;
+}
