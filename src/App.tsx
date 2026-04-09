@@ -20,6 +20,10 @@ const QRCodesPage      = React.lazy(() => import('./pages/QRCodes/QRCodesPage'))
 const DocumentosPage   = React.lazy(() => import('./pages/Documentos/DocumentosPage'));
 const DocumentoDownloadPage = React.lazy(() => import('./pages/Documentos/DocumentoDownloadPage'));
 const ChecklistFillPage = React.lazy(() => import('./pages/Checklist/ChecklistFillPage'));
+const OSAssistenciaTecnicaPage = React.lazy(() => import('./pages/Manutencao/OSAssistenciaTecnicaPage'));
+const OSPublicaPage = React.lazy(() => import('./pages/Manutencao/OSPublicaPage'));
+const ChamadoPublicoPage = React.lazy(() => import('./pages/Manutencao/ChamadoPublicoPage'));
+const TutorialPage = React.lazy(() => import('./pages/Tutorial/TutorialPage'));
 
 const DocDownloadWrapper: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -206,6 +210,10 @@ const App: React.FC = () => {
         <Route path="/checklist-preencher/:id" element={<ChecklistFillWrapper />} />
         <Route path="/contrato" element={<ContratoPage />} />
         <Route path="/proposta" element={<PropostaPage />} />
+        <Route path="/os-assistencia-tecnica" element={<OSAssistenciaTecnicaPage />} />
+        <Route path="/os-publica/:modelo" element={<OSPublicaPage />} />
+        <Route path="/chamado/:protocolo" element={<ChamadoPublicoPage />} />
+        <Route path="/tutorial" element={<TutorialPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Suspense>

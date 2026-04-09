@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { apiForgotPassword } from '../../utils/api';
 
 
 
@@ -15,6 +16,10 @@ const LoginPage: React.FC = () => {
   const [loading, setLoading]   = useState(false);
   const [dicaLoginVisivel, setDicaLoginVisivel] = useState(false);
   const [dicaSenhaVisivel, setDicaSenhaVisivel] = useState(false);
+  const [showRecuperar, setShowRecuperar] = useState(false);
+  const [recEmail, setRecEmail] = useState('');
+  const [recResultado, setRecResultado] = useState<{ tipo:'ok'|'erro'; msg:string } | null>(null);
+  const [recLoading, setRecLoading] = useState(false);
   const dicaRef = useRef<HTMLDivElement>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -34,6 +39,36 @@ const LoginPage: React.FC = () => {
   };
 
   const abrirCadastro = () => navigate('/cadastro');
+
+  const recuperarSenha = async () => {
+    const email = recEmail.trim().toLowerCase();
+    if (!email) { setRecResultado({ tipo:'erro', msg:'Digite seu e-mail.' }); return; }
+    setRecLoading(true);
+    try {
+      // Try API first
+      await apiForgotPassword(email);
+      setRecResultado({ tipo:'ok', msg:'Um e-mail com instruções para redefinir sua senha foi enviado. Verifique sua caixa de entrada.' });
+    } catch (apiErr: any) {
+      // If network error, fall back to localStorage lookup
+      if (apiErr.message?.includes('fetch') || apiErr.message?.includes('network') || apiErr.message?.includes('Failed')) {
+        try {
+          const usuarios = JSON.parse(localStorage.getItem('sm_usuarios_v2') || '[]');
+          const found = usuarios.find((u: any) => u.email?.toLowerCase() === email);
+          if (found) {
+            setRecResultado({ tipo:'ok', msg:`Sua senha é: ${found.senha}\nSeu login é: ${found.login}` });
+          } else {
+            setRecResultado({ tipo:'erro', msg:'E-mail não encontrado. Verifique o e-mail cadastrado.' });
+          }
+        } catch {
+          setRecResultado({ tipo:'erro', msg:'Erro ao buscar dados. Tente novamente.' });
+        }
+      } else {
+        setRecResultado({ tipo:'erro', msg: apiErr.message || 'E-mail não encontrado.' });
+      }
+    } finally {
+      setRecLoading(false);
+    }
+  };
 
   const abrirSuporte = () => {
     const texto = 'Olá! Preciso de ajuda com o Simples Manutenção.';
@@ -180,7 +215,7 @@ const LoginPage: React.FC = () => {
           <div style={{ textAlign: 'right', marginTop: -6 }}>
             <button
               type="button"
-              onClick={() => window.open(`https://wa.me/${WPP_NUMERO}?text=${encodeURIComponent('Olá! Esqueci minha senha do Simples Manutenção, pode me ajudar?')}`, '_blank')}
+              onClick={() => { setShowRecuperar(true); setRecEmail(''); setRecResultado(null); }}
               style={{ background: 'none', border: 'none', fontSize: 13, color: '#FF8F00', fontWeight: 700, cursor: 'pointer', padding: 0 }}
             >
               Esqueceu a senha?
@@ -272,6 +307,67 @@ const LoginPage: React.FC = () => {
         </a>
 
       </div>
+
+      {/* MODAL RECUPERAR SENHA */}
+      {showRecuperar && (
+        <div style={{
+          position:'fixed', inset:0, zIndex:9999,
+          background:'rgba(0,0,0,0.5)', display:'flex',
+          alignItems:'center', justifyContent:'center', padding:16,
+        }} onClick={() => setShowRecuperar(false)}>
+          <div style={{
+            background:'#fff', borderRadius:20, padding:'32px 28px', width:'100%', maxWidth:380,
+            boxShadow:'0 24px 80px rgba(0,0,0,0.3)',
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+              <h2 style={{ margin:0, fontSize:20, fontWeight:900, color:'#0D0D0D' }}>🔑 Recuperar Senha</h2>
+              <button onClick={() => setShowRecuperar(false)} style={{ background:'none', border:'none', fontSize:22, cursor:'pointer', color:'#71717a' }}>✕</button>
+            </div>
+            <p style={{ margin:'0 0 16px', fontSize:13, color:'#71717a', lineHeight:1.5 }}>
+              Digite o e-mail cadastrado para recuperar sua senha.
+            </p>
+            <input
+              type="email"
+              placeholder="seu@email.com"
+              value={recEmail}
+              onChange={e => { setRecEmail(e.target.value); setRecResultado(null); }}
+              onKeyDown={e => { if (e.key === 'Enter') recuperarSenha(); }}
+              autoFocus
+              style={{
+                width:'100%', padding:'14px 18px', border:'2px solid #e4e4e7',
+                borderRadius:14, fontSize:15, outline:'none', fontFamily:'inherit',
+                boxSizing:'border-box', color:'#0D0D0D', marginBottom:12,
+              }}
+            />
+            {recResultado && (
+              <div style={{
+                background: recResultado.tipo === 'ok' ? '#f0fdf4' : '#fee2e2',
+                border: `1px solid ${recResultado.tipo === 'ok' ? '#86efac' : '#fca5a5'}`,
+                borderRadius:10, padding:'12px 14px', marginBottom:12,
+                color: recResultado.tipo === 'ok' ? '#166534' : '#b91c1c',
+                fontSize:14, fontWeight:700, whiteSpace:'pre-line', lineHeight:1.6,
+              }}>
+                {recResultado.tipo === 'ok' ? '✅ ' : '⚠️ '}{recResultado.msg}
+              </div>
+            )}
+            <button
+              onClick={recuperarSenha}
+              disabled={recLoading}
+              style={{
+                width:'100%', padding:'14px',
+                background:'linear-gradient(135deg, #FFD600, #FF8F00)',
+                border:'none', borderRadius:14,
+                fontSize:15, fontWeight:900, color:'#0D0D0D',
+                cursor: recLoading ? 'not-allowed' : 'pointer',
+                opacity: recLoading ? 0.7 : 1,
+                boxShadow:'0 4px 20px rgba(255,183,0,0.4)',
+              }}
+            >
+              {recLoading ? 'Enviando...' : 'Recuperar Senha'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

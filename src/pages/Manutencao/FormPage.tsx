@@ -52,7 +52,36 @@ const FormPage: React.FC = () => {
       } else {
         localStorage.setItem(CHAMADOS_KEY, JSON.stringify([chamado, ...existentes]));
       }
-    } catch { /* localStorage full */ }
+    } catch {
+      // localStorage quota exceeded — try saving without signature images
+      try {
+        const limpar = (resp: any): any => {
+          if (!resp || typeof resp !== 'object') return resp;
+          const clean: Record<string, any> = {};
+          for (const [k, v] of Object.entries(resp)) {
+            if (typeof v === 'string' && v.startsWith('data:image') && v.length > 5000) {
+              clean[k] = '(assinatura)';
+            } else if (typeof v === 'object' && v !== null) {
+              clean[k] = limpar(v);
+            } else {
+              clean[k] = v;
+            }
+          }
+          return clean;
+        };
+        const chamadoSlim = { ...chamado, respostas: limpar(chamado.respostas) };
+        if (chamadoExistente) {
+          const atualizados = existentes.map(c =>
+            c.id === chamadoExistente.id
+              ? { ...c, respostas: chamadoSlim.respostas, localizacao: chamado.localizacao, status: 'concluido' as const, horarioFinal: Date.now(), tempoTotal: Date.now() - c.horarioInicial }
+              : c
+          );
+          localStorage.setItem(CHAMADOS_KEY, JSON.stringify(atualizados));
+        } else {
+          localStorage.setItem(CHAMADOS_KEY, JSON.stringify([chamadoSlim, ...existentes]));
+        }
+      } catch { /* still fails — continue anyway */ }
+    }
     setEnviado(true);
   };
 

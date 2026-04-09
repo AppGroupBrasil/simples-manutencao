@@ -295,6 +295,13 @@ const WizardCriar: React.FC<Props> = ({ onConcluir, onCancelar }) => {
                   </button>
                 ))}
                 <button
+                  className={`${styles.sugestaoBtn} ${nome === 'Ordem de Serviço' && !modoCustom ? styles.sugestaoBtnAtivo : ''}`}
+                  onClick={() => { setNome('Ordem de Serviço'); setIcone('📋'); setModoCustom(false); }}
+                >
+                  <span className={styles.sugestaoIcone}>📋</span>
+                  <span className={styles.sugestaoNome}>Ordem de Serviço</span>
+                </button>
+                <button
                   className={`${styles.sugestaoBtn} ${modoCustom ? styles.sugestaoBtnAtivo : ''}`}
                   onClick={() => { setModoCustom(true); setNome(''); }}
                 >

@@ -326,7 +326,7 @@ const PainelEnviadas: React.FC<Props> = ({
                     {/* QR Code */}
                     <div style={{ display:'flex', alignItems:'center', gap:14, padding:'10px 16px', background:'#f9fafb', borderRadius:12, border:'1.5px solid #e4e4e7', margin:'10px 0 8px' }}>
                       <QRCodeCanvas
-                        value={`${globalThis.location.origin}/manutencao/form?chamado=${c.id}`}
+                        value={`${globalThis.location.origin}/chamado/${c.protocolo}`}
                         size={64}
                         level="M"
                         style={{ borderRadius:6, flexShrink:0 }}

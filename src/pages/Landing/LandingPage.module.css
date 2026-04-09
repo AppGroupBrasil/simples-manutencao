@@ -583,6 +583,44 @@
   background: rgba(0, 0, 0, 0.2);
 }
 
+/* ── APP BUTTONS (Install + Share) ── */
+.heroAppButtons {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.installBtn,
+.shareBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-radius: 50px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.installBtn:hover,
+.shareBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.installBtn {
+  background: #0D0D0D;
+  color: #F5C518;
+}
+
+.shareBtn {
+  background: rgba(255, 255, 255, 0.9);
+  color: #0D0D0D;
+  border: 2px solid rgba(0, 0, 0, 0.15);
+}
+
 /* ── MOCKUP ── */
 .heroVisual {
   position: relative;
@@ -1412,6 +1450,10 @@
     justify-content: center;
   }
 
+  .heroAppButtons {
+    justify-content: center;
+  }
+
   .stepsGrid {
     flex-direction: column;
   }
@@ -1451,6 +1493,16 @@
 @media (max-width: 480px) {
   .heroStats {
     gap: 16px;
+  }
+
+  .heroAppButtons {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .installBtn,
+  .shareBtn {
+    justify-content: center;
   }
 
   .statNum {

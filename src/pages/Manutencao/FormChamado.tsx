@@ -2,9 +2,266 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Play, CheckCircle2, Clock, Camera, Star, Edit3, Save, Trash2, FileDown, Plus, Eye, EyeOff, RotateCcw } from 'lucide-react';
 import EditorImagem from '../../components/EditorImagem';
 import type { FuncaoManutencao, ChamadoManutencao, BlocoSelecionado } from './types';
-import { BLOCOS_DISPONIVEIS } from './constants';
+import { BLOCOS_DISPONIVEIS, OS_MODELOS_SHARE } from './constants';
 import MicButton from '../../components/MicButton';
 import styles from './FormChamado.module.css';
+
+/* ── Componente de Compartilhamento + Config de Campos Editáveis ── */
+const _osShareOpen: Record<string, boolean> = {};
+const _osShareEditaveis: Record<string, Record<string, boolean>> = {};
+
+/* Helper para salvar dados da OS no localStorage e retornar um ID curto */
+const _saveOSDataForShare = (modelo: string, dados: Record<string, unknown>, campos: { key: string }[]): string => {
+  const clean: Record<string, string> = {};
+  for (const c of campos) {
+    const v = dados[c.key];
+    if (v && typeof v === 'string') clean[c.key] = v;
+  }
+  if (dados.numero && typeof dados.numero === 'string') clean.numero = dados.numero;
+  if (Object.keys(clean).length === 0) return '';
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  try {
+    // Cleanup old share entries (older than 24h) to prevent localStorage bloat
+    const cutoff = Date.now() - 86400000;
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (k?.startsWith('sm_os_share_')) {
+        try {
+          const entry = JSON.parse(localStorage.getItem(k) || '');
+          if (entry?.ts && entry.ts < cutoff) localStorage.removeItem(k);
+        } catch { localStorage.removeItem(k!); }
+      }
+    }
+    localStorage.setItem(`sm_os_share_${id}`, JSON.stringify({ modelo, dados: clean, ts: Date.now() }));
+  } catch { return ''; }
+  return id;
+};
+
+const OSShareSection: React.FC<{
+  modelo: string;
+  secTitleFn: (icon: string, txt: string) => React.ReactNode;
+  osData?: Record<string, unknown>;
+}> = ({ modelo, secTitleFn, osData }) => {
+  const lsKey = `sm_os_share_config_${modelo}`;
+  const modeloDef = OS_MODELOS_SHARE[modelo];
+  const campos = modeloDef?.campos || [];
+  const [configAberto, setConfigAberto] = React.useState(() => !!_osShareOpen[modelo]);
+  const [editaveis, setEditaveisRaw] = React.useState<Record<string, boolean>>(() => {
+    if (_osShareEditaveis[modelo]) return _osShareEditaveis[modelo];
+    try { return JSON.parse(localStorage.getItem(lsKey) || '{}'); } catch { return {}; }
+  });
+  const setEditaveis = React.useCallback((fn: Record<string, boolean> | ((prev: Record<string, boolean>) => Record<string, boolean>)) => {
+    setEditaveisRaw(prev => {
+      const next = typeof fn === 'function' ? fn(prev) : fn;
+      _osShareEditaveis[modelo] = next;
+      return next;
+    });
+  }, [modelo]);
+  const [salvo, setSalvo] = React.useState(false);
+
+  const toggleConfig = React.useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfigAberto(prev => {
+      const next = !prev;
+      _osShareOpen[modelo] = next;
+      return next;
+    });
+  }, [modelo]);
+
+  const salvarConfig = () => {
+    localStorage.setItem(lsKey, JSON.stringify(editaveis));
+    setSalvo(true);
+    setTimeout(() => setSalvo(false), 2000);
+  };
+  const toggleAll = (v: boolean) => {
+    const novo: Record<string, boolean> = {};
+    for (const c of campos) novo[c.key] = v;
+    setEditaveis(novo);
+  };
+  const qtdEditaveis = campos.filter(c => editaveis[c.key]).length;
+
+  const editKeys = campos.filter(c => editaveis[c.key]).map(c => c.key);
+  const configParam = editKeys.length > 0 ? btoa(editKeys.join(',')) : '';
+
+  const [shareId, setShareId] = React.useState('');
+  const lastShareRef = React.useRef('');
+  React.useEffect(() => {
+    if (!osData) return;
+    // Only regenerate share ID when data actually changes
+    const snapshot = JSON.stringify(osData);
+    if (snapshot === lastShareRef.current) return;
+    lastShareRef.current = snapshot;
+    // Remove previous share entry to avoid filling localStorage
+    if (shareId) {
+      try { localStorage.removeItem(`sm_os_share_${shareId}`); } catch { /* ok */ }
+    }
+    const id = _saveOSDataForShare(modelo, osData, campos);
+    if (id) setShareId(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelo, osData]);
+
+  const linkPublico = shareId
+    ? globalThis.location.origin + '/os-publica/' + modelo + '?id=' + shareId
+    : globalThis.location.origin + '/os-publica/' + modelo;
+
+  const copiar = (e: React.MouseEvent<HTMLButtonElement>) => {
+    const btn = e.currentTarget;
+    navigator.clipboard.writeText(linkPublico).then(() => {
+      btn.textContent = '✅ Copiado!';
+      btn.style.background = '#16a34a';
+      setTimeout(() => { btn.textContent = '📋 Copiar'; btn.style.background = '#2563eb'; }, 2000);
+    }).catch(() => {});
+  };
+
+  const grupos = campos.reduce<Record<string, typeof campos>>((acc, c) => {
+    const g = c.grupo || 'Outros';
+    if (!acc[g]) acc[g] = [];
+    acc[g].push(c);
+    return acc;
+  }, {});
+
+  return (
+    <div style={{ background:'#f0fdf4', borderRadius:10, padding:'10px 14px', border:'1.5px solid #86efac' }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
+        {secTitleFn('🔗', 'Compartilhar Ordem de Serviço')}
+        <button type="button" onClick={toggleConfig}
+          style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 10px', background: configAberto ? '#f59e0b' : '#f3f4f6', border:'1.5px solid ' + (configAberto ? '#d97706' : '#d1d5db'), borderRadius:8, fontSize:11, fontWeight:700, color: configAberto ? '#fff' : '#4b5563', cursor:'pointer' }}>
+          ⚙️ {configAberto ? 'Fechar' : 'Configurar'}
+          {qtdEditaveis > 0 && <span style={{ background:'#2563eb', color:'#fff', borderRadius:'50%', width:18, height:18, display:'flex', alignItems:'center', justifyContent:'center', fontSize:9, fontWeight:900, marginLeft:2 }}>{qtdEditaveis}</span>}
+        </button>
+      </div>
+
+      {configAberto && (
+        <div style={{ background:'#fffbeb', borderRadius:8, padding:12, border:'1.5px solid #fde68a', marginBottom:10 }}>
+          <div style={{ fontSize:10, fontWeight:900, color:'#92400e', textTransform:'uppercase', letterSpacing:0.5, marginBottom:8 }}>
+            📋 Campos editáveis no compartilhamento
+          </div>
+          <div style={{ display:'flex', gap:6, marginBottom:10 }}>
+            <button type="button" onClick={e => { e.stopPropagation(); toggleAll(true); }} style={{ padding:'3px 10px', background:'#dcfce7', border:'1px solid #86efac', borderRadius:6, fontSize:10, fontWeight:700, color:'#15803d', cursor:'pointer' }}>✅ Marcar Todos</button>
+            <button type="button" onClick={e => { e.stopPropagation(); toggleAll(false); }} style={{ padding:'3px 10px', background:'#fee2e2', border:'1px solid #fecaca', borderRadius:6, fontSize:10, fontWeight:700, color:'#dc2626', cursor:'pointer' }}>❌ Desmarcar Todos</button>
+          </div>
+          <div style={{ maxHeight:260, overflowY:'auto', display:'flex', flexDirection:'column', gap:6 }}>
+            {Object.entries(grupos).map(([grupo, grpCampos]) => (
+              <div key={grupo}>
+                <div style={{ fontSize:9, fontWeight:900, color:'#6b7280', textTransform:'uppercase', marginBottom:3, marginTop:4 }}>{grupo}</div>
+                {grpCampos.map(c => (
+                  <label key={c.key} style={{ display:'flex', alignItems:'center', gap:8, padding:'4px 8px', background: editaveis[c.key] ? '#dcfce7' : '#fff', borderRadius:6, cursor:'pointer', border:'1px solid ' + (editaveis[c.key] ? '#86efac' : '#e5e7eb'), marginBottom:2 }}>
+                    <input type="checkbox" checked={!!editaveis[c.key]} onChange={() => setEditaveis(prev => ({ ...prev, [c.key]: !prev[c.key] }))} style={{ accentColor:'#16a34a' }} />
+                    <span style={{ fontSize:11, fontWeight:600, color: editaveis[c.key] ? '#15803d' : '#6b7280' }}>{c.label}</span>
+                  </label>
+                ))}
+              </div>
+            ))}
+          </div>
+          <button type="button" onClick={e => { e.stopPropagation(); salvarConfig(); }}
+            style={{ marginTop:10, width:'100%', padding:'8px 0', background: salvo ? '#16a34a' : '#2563eb', color:'#fff', border:'none', borderRadius:8, fontWeight:700, fontSize:12, cursor:'pointer' }}>
+            {salvo ? '✅ Configuração Salva!' : '💾 Salvar Configuração para este Modelo'}
+          </button>
+        </div>
+      )}
+
+      <div style={{ fontSize:11, color:'#6b7280', marginBottom:8 }}>
+        Compartilhe este link para preencher a O.S. {qtdEditaveis > 0 ? `Somente ${qtdEditaveis} campo(s) serão editáveis.` : 'Todos os campos estarão editáveis.'}
+      </div>
+      <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+        <input readOnly value={linkPublico} onClick={e => (e.target as HTMLInputElement).select()}
+          className={styles.campoInput}
+          style={{ flex:1, fontFamily:'monospace', fontSize:10, fontWeight:700, color:'#15803d', background:'#dcfce7', border:'2px solid #86efac' }} />
+        <button type="button" onClick={copiar}
+          style={{ padding:'8px 16px', background:'#2563eb', color:'#fff', border:'none', borderRadius:8, fontWeight:700, fontSize:12, cursor:'pointer', whiteSpace:'nowrap' }}>
+          📋 Copiar
+        </button>
+      </div>
+      <div style={{ display:'flex', gap:8, marginTop:8 }}>
+        <a href={linkPublico} target="_blank" rel="noopener noreferrer"
+          style={{ flex:1, textAlign:'center', padding:'8px 0', background:'#d97706', color:'#fff', borderRadius:8, fontWeight:700, fontSize:12, textDecoration:'none' }}>
+          🔗 Abrir Formulário
+        </a>
+        <a href={`https://wa.me/?text=${encodeURIComponent('📋 Preencha a Ordem de Serviço:\n' + linkPublico)}`} target="_blank" rel="noopener noreferrer"
+          style={{ flex:1, textAlign:'center', padding:'8px 0', background:'#16a34a', color:'#fff', borderRadius:8, fontWeight:700, fontSize:12, textDecoration:'none' }}>
+          💬 Enviar via WhatsApp
+        </a>
+      </div>
+    </div>
+  );
+};
+
+/* ── Mini-modal de cadastro inline (module level → estável entre re-renders) ── */
+const ConfigDropdown: React.FC<{
+  lsKey: string;
+  campos: { key: string; label: string; placeholder: string }[];
+  onSelect: (item: Record<string, string>) => void;
+  currentValue?: string;
+}> = ({ lsKey, campos, onSelect, currentValue }) => {
+  const [aberto, setAberto] = React.useState(false);
+  const [adicionando, setAdicionando] = React.useState(false);
+  const [novo, setNovo] = React.useState<Record<string, string>>({});
+  const [lista, setLista] = React.useState<Record<string, string>[]>(() => {
+    try { return JSON.parse(localStorage.getItem(lsKey) || '[]'); } catch { return []; }
+  });
+
+  const salvar = () => {
+    if (!novo[campos[0].key]?.trim()) return;
+    const updated = [...lista, { ...novo }];
+    localStorage.setItem(lsKey, JSON.stringify(updated));
+    setLista(updated);
+    setNovo({});
+    setAdicionando(false);
+  };
+  const remover = (idx: number) => {
+    const updated = lista.filter((_, i) => i !== idx);
+    localStorage.setItem(lsKey, JSON.stringify(updated));
+    setLista(updated);
+  };
+
+  return (
+    <div style={{ position:'relative', display:'inline-flex', alignItems:'center' }}>
+      <button type="button" onClick={e => { e.stopPropagation(); setAberto(!aberto); }} title="Cadastrar / Selecionar"
+        style={{ background:'none', border:'none', cursor:'pointer', fontSize:16, padding:2, opacity:0.7, display:'flex', alignItems:'center' }}>
+        ⚙️
+      </button>
+      {aberto && (
+        <div style={{ position:'absolute', top:'100%', right:0, zIndex:100, background:'#fff', border:'2px solid #d97706', borderRadius:12, padding:12, minWidth:280, boxShadow:'0 8px 32px rgba(0,0,0,0.18)' }}
+          onClick={e => e.stopPropagation()}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
+            <span style={{ fontSize:11, fontWeight:900, color:'#92400e', textTransform:'uppercase' }}>📋 Cadastrados</span>
+            <button type="button" onClick={() => setAberto(false)} style={{ background:'none', border:'none', cursor:'pointer', fontSize:14 }}>✕</button>
+          </div>
+          {lista.length === 0 && <div style={{ fontSize:11, color:'#9ca3af', fontStyle:'italic', marginBottom:8 }}>Nenhum cadastrado ainda.</div>}
+          {lista.map((item, idx) => (
+            <div key={idx} style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4, padding:'5px 8px', background: currentValue === item[campos[0].key] ? '#fef3c7' : '#f8fafc', borderRadius:8, border:'1px solid #e5e7eb', cursor:'pointer' }}
+              onClick={() => { onSelect(item); setAberto(false); }}>
+              <div style={{ flex:1, fontSize:11, fontWeight:600, color:'#374151' }}>
+                {campos.map(c => item[c.key]).filter(Boolean).join(' · ')}
+              </div>
+              <button type="button" onClick={e => { e.stopPropagation(); remover(idx); }}
+                style={{ background:'#fee2e2', border:'none', borderRadius:4, color:'#dc2626', fontSize:10, fontWeight:900, cursor:'pointer', padding:'2px 6px' }}>✕</button>
+            </div>
+          ))}
+          {!adicionando ? (
+            <button type="button" onClick={() => setAdicionando(true)}
+              style={{ marginTop:6, width:'100%', padding:'6px 0', background:'#fffbeb', border:'1.5px dashed #d97706', borderRadius:8, color:'#92400e', fontWeight:700, fontSize:11, cursor:'pointer' }}>
+              + Cadastrar novo
+            </button>
+          ) : (
+            <div style={{ marginTop:8, background:'#fffbeb', borderRadius:8, padding:8, border:'1.5px solid #fde68a' }}>
+              {campos.map(c => (
+                <div key={c.key} style={{ marginBottom:4 }}>
+                  <label style={{ fontSize:9, fontWeight:700, color:'#92400e' }}>{c.label}</label>
+                  <input style={{ width:'100%', padding:'6px 8px', border:'1.5px solid #e5e7eb', borderRadius:6, fontSize:11, fontFamily:'inherit' }} placeholder={c.placeholder} value={novo[c.key] || ''} onChange={e => setNovo({ ...novo, [c.key]: e.target.value })} />
+                </div>
+              ))}
+              <div style={{ display:'flex', gap:6, marginTop:6 }}>
+                <button type="button" onClick={salvar} style={{ flex:1, padding:'5px 0', background:'#16a34a', border:'none', borderRadius:6, color:'#fff', fontWeight:700, fontSize:11, cursor:'pointer' }}>✓ Salvar</button>
+                <button type="button" onClick={() => { setAdicionando(false); setNovo({}); }} style={{ flex:1, padding:'5px 0', background:'#e5e7eb', border:'none', borderRadius:6, color:'#6b7280', fontWeight:700, fontSize:11, cursor:'pointer' }}>Cancelar</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface Props {
   funcao: FuncaoManutencao;
@@ -375,6 +632,11 @@ const FormChamado: React.FC<Props> = ({
   const [locGPS, setLocGPS] = useState<Record<string, { carregando: boolean; erro: string }>>({});
   const [geoLocal, setGeoLocal] = useState<{ lat: number; lng: number; endereco?: string } | null>(rascunhoSalvo?.geoLocal || null);
   const [rascunhoSalvoMsg, setRascunhoSalvoMsg] = useState(false);
+  const [showHistorico, setShowHistorico] = useState(false);
+  const [showRelatorio, setShowRelatorio] = useState(false);
+  const [historicoFiltro, setHistoricoFiltro] = useState('');
+  const [relDataDe, setRelDataDe] = useState('');
+  const [relDataAte, setRelDataAte] = useState('');
 
   // Captura localização ao abrir o formulário
   useEffect(() => {
@@ -492,6 +754,89 @@ const FormChamado: React.FC<Props> = ({
         camposHTML += `<div style="margin-bottom:10px"><div style="font-size:10px;font-weight:800;text-transform:uppercase;color:#6b7280;margin-bottom:4px">${label}</div><div style="font-size:16px">${'★'.repeat(v)}${'☆'.repeat(5-v)} (${v}/5)</div></div>`;
         return;
       }
+      // ── Ordem de Serviço (blocos com _tipo) ──
+      if (typeof v === 'object' && v !== null && '_tipo' in v) {
+        const osData = v as Record<string, unknown>;
+        const tipoOS = String(osData._tipo || '');
+        const modeloDef = OS_MODELOS_SHARE[tipoOS];
+        const corOS = modeloDef?.cor || '#0D47A1';
+        const tituloOS = modeloDef ? `${modeloDef.icone} ${modeloDef.titulo} — ${modeloDef.subtitulo}` : label;
+
+        camposHTML += `<div style="margin-bottom:20px;border:2px solid ${corOS};border-radius:12px;overflow:hidden">`;
+        camposHTML += `<div style="background:${corOS};color:#fff;padding:12px 16px;text-align:center">`;
+        camposHTML += `<div style="font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:1.5px">${tituloOS}</div>`;
+        if (osData.numero) camposHTML += `<div style="font-size:11px;opacity:0.85;margin-top:4px;font-family:monospace;font-weight:700">Nº ${String(osData.numero)}</div>`;
+        camposHTML += `</div><div style="padding:14px 16px">`;
+
+        if (modeloDef) {
+          // Agrupar campos por grupo
+          const grupos: Record<string, typeof modeloDef.campos> = {};
+          for (const c of modeloDef.campos) {
+            const g = c.grupo || 'Outros';
+            if (!grupos[g]) grupos[g] = [];
+            grupos[g].push(c);
+          }
+          for (const [grupo, grpCampos] of Object.entries(grupos)) {
+            const temValor = grpCampos.some(c => osData[c.key]);
+            if (!temValor) continue;
+            camposHTML += `<div style="margin-bottom:12px"><div style="font-size:9px;font-weight:900;color:${corOS};text-transform:uppercase;letter-spacing:0.5px;border-bottom:1.5px solid ${corOS}33;padding-bottom:3px;margin-bottom:6px">${grupo}</div>`;
+            camposHTML += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 16px">`;
+            for (const c of grpCampos) {
+              const val = osData[c.key];
+              if (!val) continue;
+              // Skip signature fields — they're rendered in the dedicated section below
+              if (c.tipo === 'signature' || (typeof val === 'string' && (val as string).startsWith('data:image'))) continue;
+              camposHTML += `<div style="margin-bottom:4px"><div style="font-size:9px;font-weight:700;color:#9ca3af;text-transform:uppercase">${c.label}</div><div style="font-size:13px;font-weight:600;color:#111">${String(val)}</div></div>`;
+            }
+            camposHTML += `</div></div>`;
+          }
+          // Materiais (os_assistencia_tecnica)
+          const materiais = osData.materiais as Array<{descricao:string;qtd:string;preco:string;cotadoEm:string}> | undefined;
+          if (Array.isArray(materiais) && materiais.length > 0) {
+            const totalMat = materiais.reduce((a, m) => a + (Number.parseFloat(m.qtd||'0') * Number.parseFloat(m.preco||'0')), 0);
+            camposHTML += `<div style="margin-bottom:12px"><div style="font-size:9px;font-weight:900;color:${corOS};text-transform:uppercase;border-bottom:1.5px solid ${corOS}33;padding-bottom:3px;margin-bottom:6px">🛒 Materiais</div>`;
+            camposHTML += `<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:${corOS}15"><th style="padding:5px 8px;text-align:left;font-size:10px;font-weight:800;color:${corOS}">Descrição</th><th style="padding:5px 8px;text-align:center;font-size:10px;font-weight:800;color:${corOS}">Qtd</th><th style="padding:5px 8px;text-align:right;font-size:10px;font-weight:800;color:${corOS}">Preço</th></tr></thead><tbody>`;
+            for (const m of materiais) {
+              if (!m.descricao) continue;
+              camposHTML += `<tr style="border-bottom:1px solid #e5e7eb"><td style="padding:5px 8px">${m.descricao}</td><td style="padding:5px 8px;text-align:center">${m.qtd||1}</td><td style="padding:5px 8px;text-align:right">R$ ${Number.parseFloat(m.preco||'0').toFixed(2)}</td></tr>`;
+            }
+            camposHTML += `</tbody></table>`;
+            if (totalMat > 0) camposHTML += `<div style="text-align:right;font-weight:800;font-size:13px;margin-top:4px;color:${corOS}">Total Materiais: R$ ${totalMat.toFixed(2)}</div>`;
+            camposHTML += `</div>`;
+          }
+          // Valor total
+          const valorServico = Number.parseFloat(String(osData.valorServico || '0'));
+          const totalMat2 = Array.isArray(materiais) ? materiais.reduce((a, m) => a + (Number.parseFloat(m.qtd||'0') * Number.parseFloat(m.preco||'0')), 0) : 0;
+          const valorTotal = valorServico + totalMat2;
+          if (valorTotal > 0) {
+            camposHTML += `<div style="background:${corOS}10;border-radius:8px;padding:10px 14px;text-align:right;margin-bottom:12px"><span style="font-size:10px;font-weight:800;color:#6b7280;text-transform:uppercase">Valor Total </span><span style="font-size:18px;font-weight:900;color:${corOS}">R$ ${valorTotal.toFixed(2)}</span></div>`;
+          }
+        } else {
+          // Fallback: listar campos genéricos
+          for (const [key, val] of Object.entries(osData)) {
+            if (key.startsWith('_') || key === 'numero' || key === 'assinatura' || !val) continue;
+            if (typeof val === 'string' && val.startsWith('data:image')) {
+              camposHTML += `<div style="margin-bottom:8px;text-align:center"><div style="font-size:9px;font-weight:700;color:#9ca3af;text-transform:uppercase;margin-bottom:4px">${key}</div><img src="${val}" style="max-width:200px;height:70px;object-fit:contain" /></div>`;
+            } else {
+              camposHTML += `<div style="margin-bottom:4px"><div style="font-size:9px;font-weight:700;color:#9ca3af;text-transform:uppercase">${key}</div><div style="font-size:13px;font-weight:600;color:#111">${typeof val === 'object' ? JSON.stringify(val) : String(val)}</div></div>`;
+            }
+          }
+        }
+
+        // Assinaturas
+        const assinaturas = Object.entries(osData).filter(([k, val]) => k.startsWith('assinatura') && typeof val === 'string' && (val as string).startsWith('data:image'));
+        if (assinaturas.length > 0) {
+          camposHTML += `<div style="display:flex;gap:24px;justify-content:center;margin-top:12px;padding-top:12px;border-top:1.5px solid #e5e7eb">`;
+          for (const [key, val] of assinaturas) {
+            const asLabel = key.replace('assinatura', '').replace(/([A-Z])/g, ' $1').trim() || 'Assinatura';
+            camposHTML += `<div style="text-align:center"><img src="${String(val)}" style="max-width:160px;height:60px;object-fit:contain" /><div style="border-top:2px solid #1a1a1a;width:140px;margin:4px auto 0"></div><div style="font-size:9px;font-weight:800;color:#6b7280;text-transform:uppercase;margin-top:2px">${asLabel}</div></div>`;
+          }
+          camposHTML += `</div>`;
+        }
+
+        camposHTML += `</div></div>`;
+        return;
+      }
       // Texto / outros
       const txt = typeof v === 'object' ? JSON.stringify(v) : String(v);
       if (txt && txt !== '{}') {
@@ -531,32 +876,37 @@ const FormChamado: React.FC<Props> = ({
       alert(`Preencha os campos obrigatórios: ${nomes}`);
       return;
     }
-    const agora2 = Date.now();
-    const chamado: ChamadoManutencao = {
-      id: gerarId(),
-      numero: 0,
-      protocolo: gerarProtocolo(),
-      funcaoId: funcao.id,
-      funcaoNome: funcao.nome,
-      funcaoIcone: funcao.icone,
-      funcaoCor: funcao.cor,
-      responsavel: responsavel.trim(),
-      responsavelId: usuarioId,
-      status: statusAoEnviar || 'concluido',
-      horarioInicial,
-      horarioFinal: agora2,
-      tempoTotal: agora2 - horarioInicial,
-      respostas,
-      criadoPor: usuarioId,
-      criadoPorNome: usuarioNome,
-      criadoPorRole: usuarioRole,
-      criadoEm: horarioInicial,
-      adminId,
-      supervisorId,
-      ...(geoLocal ? { localizacao: geoLocal } : {}),
-    };
-    if (RASCUNHO_KEY) localStorage.removeItem(RASCUNHO_KEY);
-    onEnviar(chamado);
+    try {
+      const agora2 = Date.now();
+      const chamado: ChamadoManutencao = {
+        id: gerarId(),
+        numero: 0,
+        protocolo: gerarProtocolo(),
+        funcaoId: funcao.id,
+        funcaoNome: funcao.nome,
+        funcaoIcone: funcao.icone,
+        funcaoCor: funcao.cor,
+        responsavel: responsavel.trim(),
+        responsavelId: usuarioId,
+        status: statusAoEnviar || 'concluido',
+        horarioInicial,
+        horarioFinal: agora2,
+        tempoTotal: agora2 - horarioInicial,
+        respostas,
+        criadoPor: usuarioId,
+        criadoPorNome: usuarioNome,
+        criadoPorRole: usuarioRole,
+        criadoEm: horarioInicial,
+        adminId,
+        supervisorId,
+        ...(geoLocal ? { localizacao: geoLocal } : {}),
+      };
+      if (RASCUNHO_KEY) localStorage.removeItem(RASCUNHO_KEY);
+      onEnviar(chamado);
+    } catch (err) {
+      console.error('Erro ao enviar:', err);
+      alert('Erro ao enviar o formulário. Tente novamente.');
+    }
   };
 
   // ── Render de cada bloco ─────────────────────────────────────────────────
@@ -1718,6 +2068,1534 @@ const FormChamado: React.FC<Props> = ({
         );
       }
 
+      case 'os_assistencia_tecnica': {
+        const os = val || {};
+        const updateOS = (field: string, v: unknown) => setResposta(bloco.uid, { ...os, [field]: v });
+        if (!os._tipo) setTimeout(() => updateOS('_tipo', 'os_assistencia_tecnica'), 0);
+        if (!os.numero) {
+          const cont = Number.parseInt(localStorage.getItem('sm_contador_os_at') || '0', 10) + 1;
+          localStorage.setItem('sm_contador_os_at', String(cont));
+          const h = new Date();
+          const num = `OSAT-${h.getFullYear()}${String(h.getMonth()+1).padStart(2,'0')}${String(h.getDate()).padStart(2,'0')}-${String(cont).padStart(4,'0')}`;
+          setTimeout(() => updateOS('numero', num), 0);
+        }
+        const itensMat: Array<{ descricao: string; qtd: string; preco: string; cotadoEm: string }> = os.materiais || [];
+        const addMat = () => updateOS('materiais', [...itensMat, { descricao: '', qtd: '1', preco: '', cotadoEm: '' }]);
+        const updateMat = (idx: number, field: string, v: string) => {
+          const novo = [...itensMat];
+          novo[idx] = { ...novo[idx], [field]: v };
+          updateOS('materiais', novo);
+        };
+        const removeMat = (idx: number) => updateOS('materiais', itensMat.filter((_, i) => i !== idx));
+        const totalMat = itensMat.reduce((acc, it) => acc + (Number.parseFloat(it.qtd || '0') * Number.parseFloat(it.preco || '0')), 0);
+        const valorServico = Number.parseFloat(os.valorServico || '0');
+        const valorTotal = totalMat + valorServico;
+
+        // ── Cadastro reutilizável (localStorage) ──
+        type CadTecnico    = { nome: string };
+        type CadGestor     = { nome: string; cargo: string };
+        type CadPrestadora = { nome: string; cnpj: string; email: string; whatsapp: string };
+        type CadMaquina    = { nome: string; codigo: string; numero: string; setor?: string; modelo?: string; marca?: string; localizacao?: string };
+
+        const LS_TECNICOS    = 'sm_cad_tecnicos';
+        const LS_GESTORES    = 'sm_cad_gestores';
+        const LS_PRESTADORAS = 'sm_cad_prestadoras';
+        const LS_MAQUINAS    = 'sm_cad_maquinas';
+        const LS_TIPOS_MANUT = 'sm_cad_tipos_manutencao';
+
+        const secTitle = (icon: string, txt: string) => (
+          <div style={{ fontSize:11, fontWeight:900, color:'#b45309', textTransform:'uppercase', letterSpacing:0.8, borderBottom:'2px solid #fde68a', paddingBottom:4, marginBottom:8 }}>{icon} {txt}</div>
+        );
+        const fieldLbl = (txt: string) => (
+          <label style={{ fontSize:10, fontWeight:700, color:'#6b7280', display:'block', marginBottom:3 }}>{txt}</label>
+        );
+
+        return (
+          <div key={bloco.uid} className={styles.campo}>
+            <label className={styles.campoLabel}>{def.icone} {bloco.label || def.nome}</label>
+            <div style={{ border:'2px solid #d97706', borderRadius:14, overflow:'hidden', marginTop:8, background:'#fff' }}>
+
+              {/* Header */}
+              <div style={{ background:'linear-gradient(135deg,#d97706,#92400e)', color:'#fff', padding:'14px 16px', textAlign:'center' }}>
+                <div style={{ fontSize:15, fontWeight:900, textTransform:'uppercase', letterSpacing:1.5 }}>🛠️ ORDEM DE SERVIÇO</div>
+                <div style={{ fontSize:12, opacity:0.9, marginTop:2 }}>ASSISTÊNCIA TÉCNICA</div>
+                <div style={{ fontSize:11, opacity:0.8, marginTop:4, fontFamily:'monospace', fontWeight:700 }}>Nº {os.numero || '...'}</div>
+              </div>
+
+              <div style={{ padding:16, display:'flex', flexDirection:'column', gap:14 }}>
+
+                {/* DICA DE USO DOS DROPDOWNS */}
+                <div style={{ background:'#eff6ff', borderRadius:10, padding:'12px 16px', border:'1.5px solid #93c5fd', display:'flex', gap:10, alignItems:'flex-start' }}>
+                  <span style={{ fontSize:20, lineHeight:1 }}>💡</span>
+                  <p style={{ margin:0, fontSize:13, color:'#1e40af', lineHeight:1.5 }}>
+                    Para salvar os dados dos elementos em dropdown, preencha o campo primeiro. Logo em seguida vai aparecer o botão de salvar.
+                  </p>
+                </div>
+
+                {/* TIPO DE MANUTENÇÃO */}
+                <div style={{ background:'#fef3c7', borderRadius:10, padding:'10px 14px', border:'1.5px solid #fbbf24' }}>
+                  {secTitle('🔧', 'Tipo de Manutenção')}
+                  {(() => {
+                    let tipos: string[] = [];
+                    try { tipos = JSON.parse(localStorage.getItem(LS_TIPOS_MANUT) || '[]'); } catch { /* ok */ }
+                    return (
+                      <>
+                        <div style={{ display:'flex', gap:6, alignItems:'end' }}>
+                          <div style={{ flex:1 }}>{fieldLbl('Selecionar Tipo')}
+                            <select
+                              className={styles.campoInput}
+                              value={os.tipoManutencao || ''}
+                              onChange={e => {
+                                const sel = e.target.value;
+                                if (sel === '__novo__') {
+                                  setResposta(bloco.uid, { ...os, tipoManutencao: '' });
+                                } else {
+                                  setResposta(bloco.uid, { ...os, tipoManutencao: sel });
+                                }
+                              }}
+                              style={{ fontWeight: 700 }}
+                            >
+                              <option value="">Selecione o tipo...</option>
+                              {tipos.map((t, i) => (
+                                <option key={i} value={t}>{t}</option>
+                              ))}
+                              <option value="__novo__">+ Cadastrar novo tipo</option>
+                            </select>
+                          </div>
+                          {os.tipoManutencao && tipos.includes(os.tipoManutencao) && (
+                            <button type="button" title="Excluir tipo cadastrado" onClick={() => {
+                              if (!confirm('Excluir "' + os.tipoManutencao + '" da lista de tipos?')) return;
+                              let current: string[] = [];
+                              try { current = JSON.parse(localStorage.getItem(LS_TIPOS_MANUT) || '[]'); } catch { /* ok */ }
+                              const updated = current.filter(t => t !== os.tipoManutencao);
+                              localStorage.setItem(LS_TIPOS_MANUT, JSON.stringify(updated));
+                              setResposta(bloco.uid, { ...os, tipoManutencao: '' });
+                            }} style={{ height:36, width:36, background:'#fee2e2', border:'1.5px solid #fca5a5', borderRadius:8, color:'#dc2626', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>🗑️</button>
+                          )}
+                        </div>
+                        <div style={{ marginTop:8 }}>{fieldLbl('Nome do Tipo')}<input className={styles.campoInput} placeholder="Ex: Preventiva, Corretiva, Preditiva..." value={os.tipoManutencao || ''} onChange={e => updateOS('tipoManutencao', e.target.value)} /></div>
+                        {os.tipoManutencao && !tipos.includes(os.tipoManutencao) && (
+                          <button type="button" onClick={() => {
+                            const nome = (os.tipoManutencao || '').trim();
+                            if (!nome) return;
+                            let current: string[] = [];
+                            try { current = JSON.parse(localStorage.getItem(LS_TIPOS_MANUT) || '[]'); } catch { /* ok */ }
+                            if (current.includes(nome)) { alert('Tipo "' + nome + '" já existe!'); return; }
+                            current.push(nome);
+                            localStorage.setItem(LS_TIPOS_MANUT, JSON.stringify(current));
+                            setResposta(bloco.uid, { ...os, tipoManutencao: nome });
+                            alert('✅ Tipo "' + nome + '" salvo com sucesso!');
+                          }}
+                            style={{ marginTop:6, padding:'6px 14px', background:'#fef3c7', border:'1.5px solid #fbbf24', borderRadius:8, color:'#92400e', fontWeight:700, fontSize:11, cursor:'pointer' }}>
+                            💾 Salvar este tipo para uso futuro
+                          </button>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+
+                {/* 1 — MÁQUINA / EQUIPAMENTO */}
+                <div style={{ background:'#fffbeb', borderRadius:10, padding:'10px 14px', border:'1.5px solid #fde68a' }}>
+                  {secTitle('🖥️', '1 — Máquina / Equipamento')}
+
+                  {/* Botões: Selecionar / Cadastrar Nova */}
+                  <div style={{ display:'flex', gap:8, marginBottom:10 }}>
+                    <button type="button" onClick={() => setResposta(bloco.uid, { ...os, _maqModalAberto: true, _maqModalAba: 'selecionar' })}
+                      style={{ flex:1, padding:'10px 14px', background:'linear-gradient(135deg,#3b82f6,#1d4ed8)', border:'none', borderRadius:10, fontSize:13, fontWeight:900, color:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                      🔍 Selecionar Máquina
+                    </button>
+                    <button type="button" onClick={() => setResposta(bloco.uid, { ...os, _maqModalAberto: true, _maqModalAba: 'cadastrar' })}
+                      style={{ flex:1, padding:'10px 14px', background:'linear-gradient(135deg,#FFD600,#FF8F00)', border:'none', borderRadius:10, fontSize:13, fontWeight:900, color:'#0D0D0D', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                      ➕ Cadastrar Nova
+                    </button>
+                  </div>
+
+                  {/* Badge da máquina selecionada */}
+                  {os._cadMaqSucesso && (
+                    <div style={{ background:'#f0fdf4', borderRadius:10, padding:'10px 14px', marginBottom:10, border:'1.5px solid #86efac', display:'flex', alignItems:'center', gap:8 }}>
+                      <span style={{ fontSize:12, fontWeight:800, color:'#16a34a' }}>{os._cadMaqSucesso}</span>
+                      <button type="button" onClick={() => setResposta(bloco.uid, { ...os, _cadMaqSucesso: '' })} style={{ marginLeft:'auto', background:'none', border:'none', cursor:'pointer', fontSize:14, color:'#9ca3af' }}>✕</button>
+                    </div>
+                  )}
+                  {os.maquinaNumero ? (
+                    <div style={{ background:'#eff6ff', borderRadius:10, padding:'10px 14px', marginBottom:10, border:'1.5px solid #bfdbfe' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginBottom:6 }}>
+                        <span style={{ fontSize:11, fontWeight:900, color:'#16a34a' }}>✅ Selecionada:</span>
+                        <span style={{ background:'#fef3c7', color:'#92400e', fontSize:11, fontWeight:900, padding:'2px 8px', borderRadius:6, fontFamily:'monospace' }}>Nº {os.maquinaNumero}</span>
+                        <span style={{ fontSize:14, fontWeight:700, color:'#1e40af' }}>{os.maquinaNome}</span>
+                        <button type="button" onClick={() => setResposta(bloco.uid, { ...os, maquinaNome:'', maquinaCodigo:'', maquinaNumero:'', maquinaSetor:'', maquinaModelo:'', maquinaMarca:'', maquinaLocalizacao:'' })}
+                          style={{ marginLeft:'auto', background:'#fee2e2', border:'1.5px solid #fca5a5', borderRadius:8, padding:'3px 10px', fontSize:11, fontWeight:800, color:'#dc2626', cursor:'pointer' }}>✕ Limpar</button>
+                      </div>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:8, fontSize:11, color:'#6b7280' }}>
+                        {os.maquinaCodigo && <span style={{ fontFamily:'monospace' }}>Cód: {os.maquinaCodigo}</span>}
+                        {os.maquinaSetor && <span>🏢 {os.maquinaSetor}</span>}
+                        {os.maquinaModelo && <span>� {os.maquinaModelo}</span>}
+                        {os.maquinaMarca && <span>📝 {os.maquinaMarca}</span>}
+                        {os.maquinaLocalizacao && <span>📍 {os.maquinaLocalizacao}</span>}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ background:'#f9fafb', borderRadius:10, padding:'14px', marginBottom:10, border:'1.5px dashed #d1d5db', textAlign:'center' }}>
+                      <span style={{ fontSize:12, color:'#9ca3af' }}>Nenhuma máquina selecionada — use os botões acima</span>
+                    </div>
+                  )}
+
+                  {/* ══ MODAL SELECIONAR / CADASTRAR MÁQUINA ══ */}
+                  {os._maqModalAberto && (() => {
+                    let maqs: CadMaquina[] = [];
+                    try { maqs = JSON.parse(localStorage.getItem(LS_MAQUINAS) || '[]'); } catch { /* ok */ }
+                    const aba = os._maqModalAba || 'selecionar';
+                    const fecharModal = () => setResposta(bloco.uid, { ...os, _maqModalAberto: false, _buscaMaquina: '' });
+
+                    return (
+                      <div style={{ position:'fixed', inset:0, zIndex:10000, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
+                        onClick={fecharModal}>
+                        <div style={{ background:'#fff', borderRadius:20, width:'100%', maxWidth:560, maxHeight:'85vh', display:'flex', flexDirection:'column', boxShadow:'0 24px 80px rgba(0,0,0,0.3)', overflow:'hidden' }}
+                          onClick={e => e.stopPropagation()}>
+
+                          {/* Header */}
+                          <div style={{ background:'linear-gradient(135deg,#FFD600,#FF8F00)', padding:'18px 24px', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
+                            <div>
+                              <div style={{ fontSize:18, fontWeight:900, color:'#0D0D0D' }}>🖥️ Máquinas</div>
+                              <div style={{ fontSize:11, color:'#0D0D0D', opacity:0.7 }}>{maqs.length} cadastrada{maqs.length !== 1 ? 's' : ''}</div>
+                            </div>
+                            <button type="button" onClick={fecharModal}
+                              style={{ background:'rgba(0,0,0,0.15)', border:'none', borderRadius:'50%', width:32, height:32, fontSize:18, cursor:'pointer', color:'#0D0D0D', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+                          </div>
+
+                          {/* Tabs */}
+                          <div style={{ display:'flex', borderBottom:'2px solid #e5e7eb', flexShrink:0 }}>
+                            {([['selecionar', '🔍 Selecionar'], ['cadastrar', '➕ Cadastrar Nova']] as const).map(([key, label]) => (
+                              <button key={key} type="button" onClick={() => setResposta(bloco.uid, { ...os, _maqModalAba: key })}
+                                style={{ flex:1, padding:'11px 0', fontSize:13, fontWeight:800, border:'none', cursor:'pointer', background: aba === key ? '#fffbeb' : '#fff', color: aba === key ? '#b45309' : '#9ca3af', borderBottom: aba === key ? '3px solid #f59e0b' : '3px solid transparent' }}>
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Body */}
+                          <div style={{ padding:20, overflowY:'auto', flex:1 }}>
+
+                            {/* ═══ ABA SELECIONAR ═══ */}
+                            {aba === 'selecionar' && (
+                              <>
+                                <div style={{ position:'relative', marginBottom:12 }}>
+                                  <input
+                                    className={styles.campoInput}
+                                    placeholder="🔍 Buscar por nome, código ou Nº..."
+                                    value={os._buscaMaquina ?? ''}
+                                    onChange={e => setResposta(bloco.uid, { ...os, _buscaMaquina: e.target.value })}
+                                    autoFocus
+                                    style={{ fontWeight:700, fontSize:14, padding:'12px 40px 12px 14px' }}
+                                  />
+                                  {os._buscaMaquina && (
+                                    <button type="button" onClick={() => setResposta(bloco.uid, { ...os, _buscaMaquina: '' })}
+                                      style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', fontSize:16, color:'#9ca3af' }}>✕</button>
+                                  )}
+                                </div>
+
+                                {maqs.length === 0 ? (
+                                  <div style={{ textAlign:'center', padding:'32px 16px' }}>
+                                    <div style={{ fontSize:40, marginBottom:12 }}>🖥️</div>
+                                    <div style={{ fontSize:14, fontWeight:700, color:'#6b7280', marginBottom:6 }}>Nenhuma máquina cadastrada</div>
+                                    <div style={{ fontSize:12, color:'#9ca3af', marginBottom:16 }}>Cadastre uma máquina na aba "➕ Cadastrar Nova"</div>
+                                    <button type="button" onClick={() => setResposta(bloco.uid, { ...os, _maqModalAba: 'cadastrar' })}
+                                      style={{ padding:'10px 20px', background:'linear-gradient(135deg,#FFD600,#FF8F00)', border:'none', borderRadius:10, fontSize:13, fontWeight:900, color:'#0D0D0D', cursor:'pointer' }}>
+                                      ➕ Cadastrar Agora
+                                    </button>
+                                  </div>
+                                ) : (() => {
+                                  const q = (os._buscaMaquina || '').toLowerCase().trim();
+                                  const filtradas = q
+                                    ? maqs.filter(m => m.nome.toLowerCase().includes(q) || m.codigo.toLowerCase().includes(q) || m.numero.includes(q) || (m.setor || '').toLowerCase().includes(q))
+                                    : maqs;
+                                  return (
+                                    <>
+                                      <div style={{ fontSize:11, fontWeight:800, color:'#6b7280', marginBottom:8 }}>
+                                        {q ? `${filtradas.length} resultado${filtradas.length !== 1 ? 's' : ''}` : `${maqs.length} máquina${maqs.length !== 1 ? 's' : ''}`}
+                                      </div>
+                                      {filtradas.length === 0 ? (
+                                        <div style={{ textAlign:'center', padding:'24px 16px', color:'#9ca3af', fontSize:13 }}>
+                                          Nenhuma máquina encontrada para &quot;{os._buscaMaquina}&quot;
+                                        </div>
+                                      ) : (
+                                        <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                                          {filtradas.map(m => {
+                                            const selecionada = os.maquinaNumero === m.numero;
+                                            return (
+                                              <div key={m.numero}
+                                                onClick={() => {
+                                                  setResposta(bloco.uid, { ...os, maquinaNome: m.nome, maquinaCodigo: m.codigo, maquinaNumero: m.numero, maquinaSetor: m.setor || '', maquinaModelo: m.modelo || '', maquinaMarca: m.marca || '', maquinaLocalizacao: m.localizacao || '', _maqModalAberto: false, _buscaMaquina: '' });
+                                                }}
+                                                style={{
+                                                  padding:'12px 14px', cursor:'pointer', borderRadius:12,
+                                                  border: selecionada ? '2px solid #3b82f6' : '1.5px solid #e5e7eb',
+                                                  background: selecionada ? '#eff6ff' : '#f9fafb',
+                                                  transition:'all 0.15s',
+                                                }}
+                                                onMouseEnter={e => { if (!selecionada) e.currentTarget.style.background = '#fef9c3'; }}
+                                                onMouseLeave={e => { if (!selecionada) e.currentTarget.style.background = '#f9fafb'; }}
+                                              >
+                                                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                                                  <span style={{ background:'#fef3c7', color:'#92400e', fontSize:11, fontWeight:900, padding:'2px 8px', borderRadius:6, fontFamily:'monospace', flexShrink:0 }}>Nº {m.numero}</span>
+                                                  <span style={{ fontWeight:800, fontSize:14, color:'#0D0D0D' }}>{m.nome}</span>
+                                                  {selecionada && <span style={{ fontSize:10, fontWeight:900, color:'#3b82f6', background:'#dbeafe', padding:'2px 8px', borderRadius:6, marginLeft:'auto' }}>ATUAL</span>}
+                                                </div>
+                                                <div style={{ display:'flex', flexWrap:'wrap', gap:6, fontSize:11, color:'#6b7280' }}>
+                                                  {m.codigo && <span style={{ fontFamily:'monospace' }}>Cód: {m.codigo}</span>}
+                                                  {m.setor && <span>🏢 {m.setor}</span>}
+                                                  {m.modelo && <span>� {m.modelo}</span>}
+                                                  {m.marca && <span>📝 {m.marca}</span>}
+                                                  {m.localizacao && <span>📍 {m.localizacao}</span>}
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </>
+                            )}
+
+                            {/* ═══ ABA CADASTRAR ═══ */}
+                            {aba === 'cadastrar' && (
+                              <div>
+                                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                                  <div>{fieldLbl('Nome *')}<input className={styles.campoInput} placeholder="Ex: Compressor, Elevador..." value={os._cadNome || ''} onChange={e => setResposta(bloco.uid, { ...os, _cadNome: e.target.value })} autoFocus /></div>
+                                  <div>{fieldLbl('Código / Patrimônio')}<input className={styles.campoInput} placeholder="Ex: EQ-0042" value={os._cadCodigo || ''} onChange={e => setResposta(bloco.uid, { ...os, _cadCodigo: e.target.value })} /></div>
+                                </div>
+                                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:8 }}>
+                                  <div>{fieldLbl('Setor')}<input className={styles.campoInput} placeholder="Ex: Produção..." value={os._cadSetor || ''} onChange={e => setResposta(bloco.uid, { ...os, _cadSetor: e.target.value })} /></div>
+                                  <div>{fieldLbl('Localização')}<input className={styles.campoInput} placeholder="Ex: Bloco A, 2º andar" value={os._cadLocal || ''} onChange={e => setResposta(bloco.uid, { ...os, _cadLocal: e.target.value })} /></div>
+                                </div>
+                                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:8 }}>
+                                  <div>{fieldLbl('Operador')}<input className={styles.campoInput} placeholder="Ex: João Silva" value={os._cadModelo || ''} onChange={e => setResposta(bloco.uid, { ...os, _cadModelo: e.target.value })} /></div>
+                                  <div>{fieldLbl('Descrição')}<input className={styles.campoInput} placeholder="Ex: Ar-condicionado sala 3" value={os._cadMarca || ''} onChange={e => setResposta(bloco.uid, { ...os, _cadMarca: e.target.value })} /></div>
+                                </div>
+                                <div style={{ background:'#eff6ff', borderRadius:8, padding:'8px 12px', marginTop:10, border:'1px solid #bfdbfe' }}>
+                                  <span style={{ fontSize:11, color:'#1e40af' }}>🔢 O número de 5 dígitos será gerado automaticamente.</span>
+                                </div>
+                                {os._cadMaqErro && (
+                                  <div style={{ background:'#fef2f2', borderRadius:8, padding:'8px 12px', marginTop:8, border:'1px solid #fca5a5', display:'flex', alignItems:'center', gap:6 }}>
+                                    <span style={{ fontSize:12, fontWeight:700, color:'#dc2626' }}>⚠️ {os._cadMaqErro}</span>
+                                    <button type="button" onClick={() => setResposta(bloco.uid, { ...os, _cadMaqErro: '' })} style={{ marginLeft:'auto', background:'none', border:'none', cursor:'pointer', fontSize:14, color:'#9ca3af' }}>✕</button>
+                                  </div>
+                                )}
+                                <button type="button" onClick={() => {
+                                  const nome = (os._cadNome || '').trim();
+                                  if (!nome) { setResposta(bloco.uid, { ...os, _cadMaqErro: 'Informe o nome da máquina.' }); return; }
+                                  // Ler lista FRESCA do localStorage (evita closure stale)
+                                  let maqsAtual: CadMaquina[] = [];
+                                  try { maqsAtual = JSON.parse(localStorage.getItem(LS_MAQUINAS) || '[]'); } catch { /* ok */ }
+                                  if (maqsAtual.some(m => m.nome.toLowerCase() === nome.toLowerCase())) { setResposta(bloco.uid, { ...os, _cadMaqErro: `Máquina "${nome}" já existe!` }); return; }
+                                  try {
+                                    const contAtual = Number(localStorage.getItem('sm_contador_maquinas') || '0');
+                                    const prox = contAtual + 1;
+                                    const num = String(prox).padStart(5, '0');
+                                    const nova: CadMaquina = { nome, codigo: (os._cadCodigo || '').trim(), numero: num, setor: (os._cadSetor || '').trim() || undefined, modelo: (os._cadModelo || '').trim() || undefined, marca: (os._cadMarca || '').trim() || undefined, localizacao: (os._cadLocal || '').trim() || undefined };
+                                    const novaLista = [...maqsAtual, nova];
+                                    localStorage.setItem(LS_MAQUINAS, JSON.stringify(novaLista));
+                                    localStorage.setItem('sm_contador_maquinas', String(prox));
+                                    setResposta(bloco.uid, { ...os, maquinaNome: nova.nome, maquinaCodigo: nova.codigo, maquinaNumero: nova.numero, maquinaSetor: nova.setor || '', maquinaModelo: nova.modelo || '', maquinaMarca: nova.marca || '', maquinaLocalizacao: nova.localizacao || '', _maqModalAberto: false, _buscaMaquina: '', _cadNome:'', _cadCodigo:'', _cadSetor:'', _cadLocal:'', _cadModelo:'', _cadMarca:'', _cadMaqErro:'', _cadMaqSucesso: `✅ "${nova.nome}" cadastrada! Nº ${num}` });
+                                  } catch {
+                                    setResposta(bloco.uid, { ...os, _cadMaqErro: 'Erro ao salvar. Verifique o armazenamento do navegador.' });
+                                  }
+                                }}
+                                  style={{ marginTop:14, width:'100%', padding:'12px', background:'linear-gradient(135deg,#FFD600,#FF8F00)', border:'none', borderRadius:10, fontSize:14, fontWeight:900, color:'#0D0D0D', cursor:'pointer', boxShadow:'0 4px 16px rgba(255,183,0,0.35)' }}>
+                                  💾 Cadastrar e Selecionar
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* 2 — CHAMADO / TÉCNICO */}
+                <div style={{ background:'#f0f4ff', borderRadius:10, padding:'10px 14px', border:'1.5px solid #c7d2fe' }}>
+                  {secTitle('👷', '2 — Técnico do Chamado')}
+                  {(() => {
+                    let tecnicos: CadTecnico[] = [];
+                    try { tecnicos = JSON.parse(localStorage.getItem(LS_TECNICOS) || '[]'); } catch { /* ok */ }
+                    return (
+                      <>
+                        <div style={{ display:'flex', gap:6, alignItems:'end' }}>
+                          <div style={{ flex:1 }}>{fieldLbl('Selecionar Técnico')}
+                            <select
+                              className={styles.campoInput}
+                              value={os.tecnicoNome || ''}
+                              onChange={e => {
+                                const sel = e.target.value;
+                                if (sel === '__novo__') {
+                                  setResposta(bloco.uid, { ...os, tecnicoNome: '' });
+                                } else if (sel) {
+                                  setResposta(bloco.uid, { ...os, tecnicoNome: sel });
+                                } else {
+                                  setResposta(bloco.uid, { ...os, tecnicoNome: '' });
+                                }
+                              }}
+                              style={{ fontWeight: 700 }}
+                            >
+                              <option value="">Selecione um técnico...</option>
+                              {tecnicos.map((t, i) => (
+                                <option key={i} value={t.nome}>{t.nome}</option>
+                              ))}
+                              <option value="__novo__">+ Cadastrar novo técnico</option>
+                            </select>
+                          </div>
+                          {os.tecnicoNome && tecnicos.some(t => t.nome === os.tecnicoNome) && (
+                            <button type="button" title="Excluir técnico cadastrado" onClick={() => {
+                              if (!confirm('Excluir "' + os.tecnicoNome + '" da lista de técnicos?')) return;
+                              let current: CadTecnico[] = [];
+                              try { current = JSON.parse(localStorage.getItem(LS_TECNICOS) || '[]'); } catch { /* ok */ }
+                              const updated = current.filter(t => t.nome !== os.tecnicoNome);
+                              localStorage.setItem(LS_TECNICOS, JSON.stringify(updated));
+                              setResposta(bloco.uid, { ...os, tecnicoNome: '' });
+                            }} style={{ height:36, width:36, background:'#fee2e2', border:'1.5px solid #fca5a5', borderRadius:8, color:'#dc2626', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>🗑️</button>
+                          )}
+                        </div>
+                        <div style={{ marginTop:8 }}>{fieldLbl('Nome do Técnico')}<input className={styles.campoInput} placeholder="Nome do técnico responsável..." value={os.tecnicoNome || ''} onChange={e => updateOS('tecnicoNome', e.target.value)} /></div>
+                        {os.tecnicoNome && !tecnicos.some(t => t.nome === os.tecnicoNome) && (
+                          <button type="button" onClick={() => {
+                            if (!os.tecnicoNome?.trim()) return;
+                            const updated = [...tecnicos, { nome: os.tecnicoNome.trim() }];
+                            localStorage.setItem(LS_TECNICOS, JSON.stringify(updated));
+                            setResposta(bloco.uid, { ...os, tecnicoNome: os.tecnicoNome.trim() });
+                            alert('✅ Técnico "' + os.tecnicoNome.trim() + '" salvo com sucesso!');
+                          }}
+                            style={{ marginTop:6, padding:'6px 14px', background:'#dbeafe', border:'1.5px solid #93c5fd', borderRadius:8, color:'#1d4ed8', fontWeight:700, fontSize:11, cursor:'pointer' }}>
+                            💾 Salvar este técnico para uso futuro
+                          </button>
+                        )}
+                      </>
+                    );
+                  })()}
+                  <div style={{ marginTop:8 }}>
+                    <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
+                      {fieldLbl('Descrição do Problema / Serviço')}
+                      <MicButton onResult={t => updateOS('tecnicoDescricao', (os.tecnicoDescricao || '') + (os.tecnicoDescricao ? ' ' : '') + t)} />
+                    </div>
+                    <textarea className={styles.campoInput} rows={3} placeholder="Descreva o problema encontrado e o serviço a ser executado..." value={os.tecnicoDescricao || ''} onChange={e => updateOS('tecnicoDescricao', e.target.value)} />
+                  </div>
+                </div>
+
+                {/* 3 — AVALIAÇÃO TÉCNICA TERCEIRIZADA */}
+                <div style={{ background:'#fef3c7', borderRadius:10, padding:'10px 14px', border:'1.5px solid #fde68a' }}>
+                  {secTitle('📋', '3 — Avaliação de Técnico Terceirizado')}
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
+                    {fieldLbl('Parecer / Laudo Técnico')}
+                    <MicButton onResult={t => updateOS('avaliacaoTerceirizada', (os.avaliacaoTerceirizada || '') + (os.avaliacaoTerceirizada ? ' ' : '') + t)} />
+                  </div>
+                  <textarea className={styles.campoInput} rows={3} placeholder="Diagnóstico e parecer do técnico terceirizado..." value={os.avaliacaoTerceirizada || ''} onChange={e => updateOS('avaliacaoTerceirizada', e.target.value)} />
+                </div>
+
+                {/* 4 — COMPRA DE MATERIAL */}
+                <div style={{ background:'#f0fdf4', borderRadius:10, padding:'10px 14px', border:'1.5px solid #bbf7d0' }}>
+                  {secTitle('🛒', '4 — Compra de Material')}
+                  <div style={{ marginBottom:10 }}>
+                    {fieldLbl('Necessita compra de material?')}
+                    <div style={{ display:'flex', gap:8, marginTop:4 }}>
+                      {['Sim', 'Não'].map(opt => (
+                        <button key={opt} type="button" onClick={() => updateOS('compraMaterial', opt)}
+                          style={{ padding:'6px 18px', borderRadius:8, fontWeight:700, fontSize:13, border: os.compraMaterial === opt ? '2px solid #16a34a' : '2px solid #d1d5db', background: os.compraMaterial === opt ? '#dcfce7' : '#fff', color: os.compraMaterial === opt ? '#15803d' : '#6b7280', cursor:'pointer' }}>
+                          {opt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {os.compraMaterial === 'Sim' && (
+                    <>
+                      <div style={{ fontSize:10, fontWeight:700, color:'#4b5563', marginBottom:6 }}>Itens de Material</div>
+                      {itensMat.map((it, idx) => (
+                        <div key={idx} style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr 2fr 30px', gap:6, marginBottom:6, alignItems:'end' }}>
+                          <div>{fieldLbl('Descrição')}<input className={styles.campoInput} placeholder="Material..." value={it.descricao} onChange={e => updateMat(idx, 'descricao', e.target.value)} /></div>
+                          <div>{fieldLbl('Qtd')}<input className={styles.campoInput} type="number" min={1} value={it.qtd} onChange={e => updateMat(idx, 'qtd', e.target.value)} /></div>
+                          <div>{fieldLbl('Preço (R$)')}<input className={styles.campoInput} type="number" min={0} step={0.01} value={it.preco} onChange={e => updateMat(idx, 'preco', e.target.value)} /></div>
+                          <div>{fieldLbl('Onde foi cotado')}<input className={styles.campoInput} placeholder="Loja / fornecedor..." value={it.cotadoEm} onChange={e => updateMat(idx, 'cotadoEm', e.target.value)} /></div>
+                          <button type="button" onClick={() => removeMat(idx)} style={{ background:'#fee2e2', border:'none', borderRadius:6, color:'#dc2626', fontWeight:900, cursor:'pointer', height:32 }}>✕</button>
+                        </div>
+                      ))}
+                      <button type="button" onClick={addMat} style={{ background:'#dcfce7', border:'1.5px dashed #16a34a', borderRadius:8, padding:'6px 14px', color:'#15803d', fontWeight:700, fontSize:12, cursor:'pointer', width:'100%' }}>+ Adicionar Material</button>
+                      {totalMat > 0 && (
+                        <div style={{ textAlign:'right', fontWeight:900, fontSize:13, color:'#15803d', marginTop:6 }}>Total Materiais: R$ {totalMat.toFixed(2)}</div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {/* 5 — PRESTADORA DE SERVIÇO */}
+                <div style={{ background:'#faf5ff', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e9d5ff' }}>
+                  {secTitle('🏢', '5 — Prestadora de Serviço')}
+
+                  {/* Botões: Selecionar / Cadastrar Nova */}
+                  <div style={{ display:'flex', gap:8, marginBottom:10 }}>
+                    <button type="button" onClick={() => setResposta(bloco.uid, { ...os, _prestModalAberto: true, _prestModalAba: 'selecionar' })}
+                      style={{ flex:1, padding:'10px 14px', background:'linear-gradient(135deg,#a855f7,#7c3aed)', border:'none', borderRadius:10, fontSize:13, fontWeight:900, color:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                      🔍 Selecionar Prestadora
+                    </button>
+                    <button type="button" onClick={() => setResposta(bloco.uid, { ...os, _prestModalAberto: true, _prestModalAba: 'cadastrar' })}
+                      style={{ flex:1, padding:'10px 14px', background:'linear-gradient(135deg,#FFD600,#FF8F00)', border:'none', borderRadius:10, fontSize:13, fontWeight:900, color:'#0D0D0D', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:6 }}>
+                      ➕ Cadastrar Nova
+                    </button>
+                  </div>
+
+                  {/* Toast de sucesso */}
+                  {os._cadPrestSucesso && (
+                    <div style={{ background:'#f0fdf4', borderRadius:10, padding:'10px 14px', marginBottom:10, border:'1.5px solid #86efac', display:'flex', alignItems:'center', gap:8 }}>
+                      <span style={{ fontSize:12, fontWeight:800, color:'#16a34a' }}>{os._cadPrestSucesso}</span>
+                      <button type="button" onClick={() => setResposta(bloco.uid, { ...os, _cadPrestSucesso: '' })} style={{ marginLeft:'auto', background:'none', border:'none', cursor:'pointer', fontSize:14, color:'#9ca3af' }}>✕</button>
+                    </div>
+                  )}
+
+                  {/* Badge da prestadora selecionada */}
+                  {os.prestadoraNome ? (
+                    <div style={{ background:'#faf5ff', borderRadius:10, padding:'10px 14px', marginBottom:10, border:'1.5px solid #e9d5ff' }}>
+                      <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap', marginBottom:6 }}>
+                        <span style={{ fontSize:11, fontWeight:900, color:'#16a34a' }}>✅ Selecionada:</span>
+                        <span style={{ fontSize:14, fontWeight:700, color:'#7c3aed' }}>{os.prestadoraNome}</span>
+                        <button type="button" onClick={() => setResposta(bloco.uid, { ...os, prestadoraNome:'', prestadoraCnpj:'', prestadoraEmail:'', prestadoraWhatsapp:'' })}
+                          style={{ marginLeft:'auto', background:'#fee2e2', border:'1.5px solid #fca5a5', borderRadius:8, padding:'3px 10px', fontSize:11, fontWeight:800, color:'#dc2626', cursor:'pointer' }}>✕ Limpar</button>
+                      </div>
+                      <div style={{ display:'flex', flexWrap:'wrap', gap:8, fontSize:11, color:'#6b7280' }}>
+                        {os.prestadoraCnpj && <span style={{ fontFamily:'monospace' }}>CNPJ: {os.prestadoraCnpj}</span>}
+                        {os.prestadoraEmail && <span>📧 {os.prestadoraEmail}</span>}
+                        {os.prestadoraWhatsapp && <span>📱 {os.prestadoraWhatsapp}</span>}
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ background:'#f9fafb', borderRadius:10, padding:'14px', marginBottom:10, border:'1.5px dashed #d1d5db', textAlign:'center' }}>
+                      <span style={{ fontSize:12, color:'#9ca3af' }}>Nenhuma prestadora selecionada — use os botões acima</span>
+                    </div>
+                  )}
+
+                  {/* ══ MODAL SELECIONAR / CADASTRAR PRESTADORA ══ */}
+                  {os._prestModalAberto && (() => {
+                    let prests: CadPrestadora[] = [];
+                    try { prests = JSON.parse(localStorage.getItem(LS_PRESTADORAS) || '[]'); } catch { /* ok */ }
+                    const aba = os._prestModalAba || 'selecionar';
+                    const fecharModal = () => setResposta(bloco.uid, { ...os, _prestModalAberto: false, _buscaPrestadora: '' });
+
+                    return (
+                      <div style={{ position:'fixed', inset:0, zIndex:10000, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
+                        onClick={fecharModal}>
+                        <div style={{ background:'#fff', borderRadius:20, width:'100%', maxWidth:560, maxHeight:'85vh', display:'flex', flexDirection:'column', boxShadow:'0 24px 80px rgba(0,0,0,0.3)', overflow:'hidden' }}
+                          onClick={e => e.stopPropagation()}>
+
+                          {/* Header */}
+                          <div style={{ background:'linear-gradient(135deg,#a855f7,#7c3aed)', padding:'18px 24px', display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
+                            <div>
+                              <div style={{ fontSize:18, fontWeight:900, color:'#fff' }}>🏢 Prestadoras</div>
+                              <div style={{ fontSize:11, color:'#fff', opacity:0.7 }}>{prests.length} cadastrada{prests.length !== 1 ? 's' : ''}</div>
+                            </div>
+                            <button type="button" onClick={fecharModal}
+                              style={{ background:'rgba(255,255,255,0.2)', border:'none', borderRadius:'50%', width:32, height:32, fontSize:18, cursor:'pointer', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+                          </div>
+
+                          {/* Tabs */}
+                          <div style={{ display:'flex', borderBottom:'2px solid #e5e7eb', flexShrink:0 }}>
+                            {([['selecionar', '🔍 Selecionar'], ['cadastrar', '➕ Cadastrar Nova']] as const).map(([key, label]) => (
+                              <button key={key} type="button" onClick={() => setResposta(bloco.uid, { ...os, _prestModalAba: key })}
+                                style={{ flex:1, padding:'11px 0', fontSize:13, fontWeight:800, border:'none', cursor:'pointer', background: aba === key ? '#faf5ff' : '#fff', color: aba === key ? '#7c3aed' : '#9ca3af', borderBottom: aba === key ? '3px solid #a855f7' : '3px solid transparent' }}>
+                                {label}
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Body */}
+                          <div style={{ padding:20, overflowY:'auto', flex:1 }}>
+
+                            {/* ═══ ABA SELECIONAR ═══ */}
+                            {aba === 'selecionar' && (
+                              <>
+                                <div style={{ position:'relative', marginBottom:12 }}>
+                                  <input
+                                    className={styles.campoInput}
+                                    placeholder="🔍 Buscar por nome, CNPJ..."
+                                    value={os._buscaPrestadora ?? ''}
+                                    onChange={e => setResposta(bloco.uid, { ...os, _buscaPrestadora: e.target.value })}
+                                    autoFocus
+                                    style={{ fontWeight:700, fontSize:14, padding:'12px 40px 12px 14px' }}
+                                  />
+                                  {os._buscaPrestadora && (
+                                    <button type="button" onClick={() => setResposta(bloco.uid, { ...os, _buscaPrestadora: '' })}
+                                      style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', fontSize:16, color:'#9ca3af' }}>✕</button>
+                                  )}
+                                </div>
+
+                                {prests.length === 0 ? (
+                                  <div style={{ textAlign:'center', padding:'32px 16px' }}>
+                                    <div style={{ fontSize:40, marginBottom:12 }}>🏢</div>
+                                    <div style={{ fontSize:14, fontWeight:700, color:'#6b7280', marginBottom:6 }}>Nenhuma prestadora cadastrada</div>
+                                    <div style={{ fontSize:12, color:'#9ca3af', marginBottom:16 }}>Cadastre uma prestadora na aba "➕ Cadastrar Nova"</div>
+                                    <button type="button" onClick={() => setResposta(bloco.uid, { ...os, _prestModalAba: 'cadastrar' })}
+                                      style={{ padding:'10px 20px', background:'linear-gradient(135deg,#FFD600,#FF8F00)', border:'none', borderRadius:10, fontSize:13, fontWeight:900, color:'#0D0D0D', cursor:'pointer' }}>
+                                      ➕ Cadastrar Agora
+                                    </button>
+                                  </div>
+                                ) : (() => {
+                                  const q = (os._buscaPrestadora || '').toLowerCase().trim();
+                                  const filtradas = q
+                                    ? prests.filter(p => p.nome.toLowerCase().includes(q) || (p.cnpj || '').toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q))
+                                    : prests;
+                                  return (
+                                    <>
+                                      <div style={{ fontSize:11, fontWeight:800, color:'#6b7280', marginBottom:8 }}>
+                                        {q ? `${filtradas.length} resultado${filtradas.length !== 1 ? 's' : ''}` : `${prests.length} prestadora${prests.length !== 1 ? 's' : ''}`}
+                                      </div>
+                                      {filtradas.length === 0 ? (
+                                        <div style={{ textAlign:'center', padding:'24px 16px', color:'#9ca3af', fontSize:13 }}>
+                                          Nenhuma prestadora encontrada para &quot;{os._buscaPrestadora}&quot;
+                                        </div>
+                                      ) : (
+                                        <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                                          {filtradas.map(p => {
+                                            const selecionada = os.prestadoraNome === p.nome;
+                                            return (
+                                              <div key={p.nome}
+                                                onClick={() => {
+                                                  setResposta(bloco.uid, { ...os, prestadoraNome: p.nome, prestadoraCnpj: p.cnpj || '', prestadoraEmail: p.email || '', prestadoraWhatsapp: p.whatsapp || '', _prestModalAberto: false, _buscaPrestadora: '' });
+                                                }}
+                                                style={{
+                                                  padding:'12px 14px', cursor:'pointer', borderRadius:12,
+                                                  border: selecionada ? '2px solid #a855f7' : '1.5px solid #e5e7eb',
+                                                  background: selecionada ? '#faf5ff' : '#f9fafb',
+                                                  transition:'all 0.15s',
+                                                }}
+                                                onMouseEnter={e => { if (!selecionada) e.currentTarget.style.background = '#faf5ff'; }}
+                                                onMouseLeave={e => { if (!selecionada) e.currentTarget.style.background = '#f9fafb'; }}
+                                              >
+                                                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                                                  <span style={{ fontWeight:800, fontSize:14, color:'#0D0D0D' }}>{p.nome}</span>
+                                                  {selecionada && <span style={{ fontSize:10, fontWeight:900, color:'#7c3aed', background:'#f3e8ff', padding:'2px 8px', borderRadius:6, marginLeft:'auto' }}>ATUAL</span>}
+                                                </div>
+                                                <div style={{ display:'flex', flexWrap:'wrap', gap:6, fontSize:11, color:'#6b7280' }}>
+                                                  {p.cnpj && <span style={{ fontFamily:'monospace' }}>CNPJ: {p.cnpj}</span>}
+                                                  {p.email && <span>📧 {p.email}</span>}
+                                                  {p.whatsapp && <span>📱 {p.whatsapp}</span>}
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                              </>
+                            )}
+
+                            {/* ═══ ABA CADASTRAR ═══ */}
+                            {aba === 'cadastrar' && (
+                              <div>
+                                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                                  <div>{fieldLbl('Nome / Razão Social *')}<input className={styles.campoInput} placeholder="Nome da empresa..." value={os._cadPrestNome || ''} onChange={e => setResposta(bloco.uid, { ...os, _cadPrestNome: e.target.value })} autoFocus /></div>
+                                  <div>{fieldLbl('CNPJ')}<input className={styles.campoInput} placeholder="00.000.000/0000-00" value={os._cadPrestCnpj || ''} onChange={e => setResposta(bloco.uid, { ...os, _cadPrestCnpj: e.target.value })} /></div>
+                                </div>
+                                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:8 }}>
+                                  <div>{fieldLbl('E-mail')}<input className={styles.campoInput} type="email" placeholder="contato@empresa.com" value={os._cadPrestEmail || ''} onChange={e => setResposta(bloco.uid, { ...os, _cadPrestEmail: e.target.value })} /></div>
+                                  <div>{fieldLbl('WhatsApp')}<input className={styles.campoInput} placeholder="(00) 00000-0000" value={os._cadPrestWhatsapp || ''} onChange={e => setResposta(bloco.uid, { ...os, _cadPrestWhatsapp: e.target.value })} /></div>
+                                </div>
+                                {os._cadPrestErro && (
+                                  <div style={{ background:'#fef2f2', borderRadius:8, padding:'8px 12px', marginTop:8, border:'1px solid #fca5a5', display:'flex', alignItems:'center', gap:6 }}>
+                                    <span style={{ fontSize:12, fontWeight:700, color:'#dc2626' }}>⚠️ {os._cadPrestErro}</span>
+                                    <button type="button" onClick={() => setResposta(bloco.uid, { ...os, _cadPrestErro: '' })} style={{ marginLeft:'auto', background:'none', border:'none', cursor:'pointer', fontSize:14, color:'#9ca3af' }}>✕</button>
+                                  </div>
+                                )}
+                                <button type="button" onClick={() => {
+                                  const nome = (os._cadPrestNome || '').trim();
+                                  if (!nome) { setResposta(bloco.uid, { ...os, _cadPrestErro: 'Informe o nome da prestadora.' }); return; }
+                                  let prestsAtual: CadPrestadora[] = [];
+                                  try { prestsAtual = JSON.parse(localStorage.getItem(LS_PRESTADORAS) || '[]'); } catch { /* ok */ }
+                                  if (prestsAtual.some(p => p.nome.toLowerCase() === nome.toLowerCase())) { setResposta(bloco.uid, { ...os, _cadPrestErro: `Prestadora "${nome}" já existe!` }); return; }
+                                  try {
+                                    const nova: CadPrestadora = { nome, cnpj: (os._cadPrestCnpj || '').trim(), email: (os._cadPrestEmail || '').trim(), whatsapp: (os._cadPrestWhatsapp || '').trim() };
+                                    const novaLista = [...prestsAtual, nova];
+                                    localStorage.setItem(LS_PRESTADORAS, JSON.stringify(novaLista));
+                                    setResposta(bloco.uid, { ...os, prestadoraNome: nova.nome, prestadoraCnpj: nova.cnpj, prestadoraEmail: nova.email, prestadoraWhatsapp: nova.whatsapp, _prestModalAberto: false, _buscaPrestadora: '', _cadPrestNome:'', _cadPrestCnpj:'', _cadPrestEmail:'', _cadPrestWhatsapp:'', _cadPrestErro:'', _cadPrestSucesso: `✅ "${nova.nome}" cadastrada com sucesso!` });
+                                  } catch {
+                                    setResposta(bloco.uid, { ...os, _cadPrestErro: 'Erro ao salvar. Verifique o armazenamento do navegador.' });
+                                  }
+                                }}
+                                  style={{ marginTop:14, width:'100%', padding:'12px', background:'linear-gradient(135deg,#FFD600,#FF8F00)', border:'none', borderRadius:10, fontSize:14, fontWeight:900, color:'#0D0D0D', cursor:'pointer', boxShadow:'0 4px 16px rgba(255,183,0,0.35)' }}>
+                                  💾 Cadastrar e Selecionar
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* 6 — PRAZO */}
+                <div style={{ background:'#fff7ed', borderRadius:10, padding:'10px 14px', border:'1.5px solid #fed7aa' }}>
+                  {secTitle('📅', '6 — Prazo para Conclusão')}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <div>{fieldLbl('Data Limite')}<input className={styles.campoInput} type="date" value={os.prazoData || ''} onChange={e => updateOS('prazoData', e.target.value)} /></div>
+                    <div>{fieldLbl('Observação do Prazo')}<input className={styles.campoInput} placeholder="Ex: dias úteis, urgente..." value={os.prazoObs || ''} onChange={e => updateOS('prazoObs', e.target.value)} /></div>
+                  </div>
+                </div>
+
+                {/* 7 — GESTOR VALIDADOR */}
+                <div style={{ background:'#f0f4ff', borderRadius:10, padding:'10px 14px', border:'1.5px solid #c7d2fe' }}>
+                  {secTitle('✅', '7 — Gestor que Valida a O.S')}
+                  {(() => {
+                    let gestores: CadGestor[] = [];
+                    try { gestores = JSON.parse(localStorage.getItem(LS_GESTORES) || '[]'); } catch { /* ok */ }
+                    return (
+                      <>
+                        <div style={{ display:'flex', gap:6, alignItems:'end' }}>
+                          <div style={{ flex:1 }}>{fieldLbl('Selecionar Gestor')}
+                            <select
+                              className={styles.campoInput}
+                              value={os.gestorNome || ''}
+                              onChange={e => {
+                                const sel = e.target.value;
+                                if (sel === '__novo__') {
+                                  setResposta(bloco.uid, { ...os, gestorNome: '', gestorCargo: '' });
+                                } else if (sel) {
+                                  const g = gestores.find(g => g.nome === sel);
+                                  if (g) { setResposta(bloco.uid, { ...os, gestorNome: g.nome, gestorCargo: g.cargo || '' }); }
+                                } else {
+                                  setResposta(bloco.uid, { ...os, gestorNome: '', gestorCargo: '' });
+                                }
+                              }}
+                              style={{ fontWeight: 700 }}
+                            >
+                              <option value="">Selecione um gestor...</option>
+                              {gestores.map((g, i) => (
+                                <option key={i} value={g.nome}>{g.nome}{g.cargo ? ` — ${g.cargo}` : ''}</option>
+                              ))}
+                              <option value="__novo__">+ Cadastrar novo gestor</option>
+                            </select>
+                          </div>
+                          {os.gestorNome && gestores.some(g => g.nome === os.gestorNome) && (
+                            <button type="button" title="Excluir gestor cadastrado" onClick={() => {
+                              if (!confirm('Excluir "' + os.gestorNome + '" da lista de gestores?')) return;
+                              let current: CadGestor[] = [];
+                              try { current = JSON.parse(localStorage.getItem(LS_GESTORES) || '[]'); } catch { /* ok */ }
+                              const updated = current.filter(g => g.nome !== os.gestorNome);
+                              localStorage.setItem(LS_GESTORES, JSON.stringify(updated));
+                              setResposta(bloco.uid, { ...os, gestorNome: '', gestorCargo: '' });
+                            }} style={{ height:36, width:36, background:'#fee2e2', border:'1.5px solid #fca5a5', borderRadius:8, color:'#dc2626', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>🗑️</button>
+                          )}
+                        </div>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:8 }}>
+                          <div>{fieldLbl('Nome do Gestor')}<input className={styles.campoInput} placeholder="Nome completo..." value={os.gestorNome || ''} onChange={e => updateOS('gestorNome', e.target.value)} /></div>
+                          <div>{fieldLbl('Cargo')}<input className={styles.campoInput} placeholder="Ex: Gerente, Supervisor..." value={os.gestorCargo || ''} onChange={e => updateOS('gestorCargo', e.target.value)} /></div>
+                        </div>
+                        {os.gestorNome && !gestores.some(g => g.nome === os.gestorNome) && (
+                          <button type="button" onClick={() => {
+                            if (!os.gestorNome?.trim()) return;
+                            const updated = [...gestores, { nome: os.gestorNome.trim(), cargo: os.gestorCargo?.trim() || '' }];
+                            localStorage.setItem(LS_GESTORES, JSON.stringify(updated));
+                            setResposta(bloco.uid, { ...os, gestorNome: os.gestorNome.trim() });
+                            alert('✅ Gestor "' + os.gestorNome.trim() + '" salvo com sucesso!');
+                          }}
+                            style={{ marginTop:6, padding:'6px 14px', background:'#dcfce7', border:'1.5px solid #86efac', borderRadius:8, color:'#15803d', fontWeight:700, fontSize:11, cursor:'pointer' }}>
+                            💾 Salvar este gestor para uso futuro
+                          </button>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+
+                {/* 8 — VALOR TOTAL */}
+                <div style={{ background:'#f0fdf4', border:'2px solid #86efac', borderRadius:10, padding:'10px 14px', textAlign:'center' }}>
+                  {secTitle('💰', '8 — Valor do Serviço')}
+                  {fieldLbl('Valor do Serviço (R$)')}
+                  <input className={styles.campoInput} type="number" min={0} step={0.01} placeholder="0,00" value={os.valorServico || ''} onChange={e => updateOS('valorServico', e.target.value)} style={{ fontSize:20, fontWeight:900, fontFamily:'monospace', textAlign:'center', border:'2px solid #86efac' }} />
+                  {valorTotal > 0 && (
+                    <div style={{ marginTop:8, fontSize:14, fontWeight:900, color:'#15803d' }}>
+                      💰 Valor Total (Serviço + Material): R$ {valorTotal.toFixed(2)}
+                    </div>
+                  )}
+                </div>
+
+                {/* 9 — STATUS E PRIORIDADE */}
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  <div style={{ background:'#f8fafc', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e2e8f0' }}>
+                    {fieldLbl('Status')}
+                    <select className={styles.campoInput} value={os.status || ''} onChange={e => updateOS('status', e.target.value)} style={{ fontWeight:700 }}>
+                      <option value="">Selecione...</option>
+                      <option value="Aguardando">⏳ Aguardando</option>
+                      <option value="Em andamento">🔄 Em andamento</option>
+                      <option value="Aguardando peça">📦 Aguardando peça</option>
+                      <option value="Concluído">✅ Concluído</option>
+                      <option value="Cancelado">❌ Cancelado</option>
+                    </select>
+                  </div>
+                  <div style={{ background:'#f8fafc', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e2e8f0' }}>
+                    {fieldLbl('Prioridade')}
+                    <select className={styles.campoInput} value={os.prioridade || ''} onChange={e => updateOS('prioridade', e.target.value)} style={{ fontWeight:700 }}>
+                      <option value="">Selecione...</option>
+                      <option value="Baixa">🟢 Baixa</option>
+                      <option value="Média">🟡 Média</option>
+                      <option value="Alta">🟠 Alta</option>
+                      <option value="Urgente">🔴 Urgente</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* ASSINATURA DO GESTOR */}
+                <div style={{ background:'#f9fafb', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e5e7eb' }}>
+                  <div style={{ fontSize:10, fontWeight:900, color:'#4b5563', textTransform:'uppercase', letterSpacing:0.5, marginBottom:8, textAlign:'center' }}>✍️ Assinatura de Validação</div>
+                  <div style={{ display:'flex', gap:12 }}>
+                    <AssinaturaInline label="Gestor" value={os.assinaturaGestor || null} onChange={v => updateOS('assinaturaGestor', v)} />
+                    <AssinaturaInline label="Técnico" value={os.assinaturaTecnico || null} onChange={v => updateOS('assinaturaTecnico', v)} />
+                  </div>
+                </div>
+
+                {/* 10 — COMPARTILHAR POR E-MAIL */}
+                {(() => {
+                  const LS_EMAILS = 'sm_cad_emails_os';
+                  const modeloCampos = OS_MODELOS_SHARE['os_assistencia_tecnica']?.campos || [];
+                  const sid = _saveOSDataForShare('os_assistencia_tecnica', os, modeloCampos);
+                  const linkEditar = globalThis.location.origin + '/os-publica/os_assistencia_tecnica' + (sid ? '?id=' + sid : '');
+                  const resumoOS = () => {
+                    const linhas = [`O.S Assistência Técnica — Nº ${os.numero || '...'}`, ''];
+                    if (os.maquinaNome) linhas.push(`Máquina: ${os.maquinaNumero ? `Nº ${os.maquinaNumero} — ` : ''}${os.maquinaNome} (${os.maquinaCodigo || '-'})`);
+                    if (os.maquinaSetor) linhas.push(`Setor: ${os.maquinaSetor}`);
+                    if (os.tecnicoNome) linhas.push(`Técnico: ${os.tecnicoNome}`);
+                    if (os.tecnicoDescricao) linhas.push(`Descrição: ${os.tecnicoDescricao}`);
+                    if (os.prestadoraNome) linhas.push(`Prestadora: ${os.prestadoraNome} — CNPJ: ${os.prestadoraCnpj || '-'}`);
+                    if (os.prazoData) linhas.push(`Prazo: ${os.prazoData}`);
+                    if (os.gestorNome) linhas.push(`Gestor: ${os.gestorNome} (${os.gestorCargo || '-'})`);
+                    if (os.status) linhas.push(`Status: ${os.status}`);
+                    if (os.prioridade) linhas.push(`Prioridade: ${os.prioridade}`);
+                    const vt = (Number.parseFloat(os.valorServico || '0') + itensMat.reduce((a: number, i: {qtd:string;preco:string}) => a + Number.parseFloat(i.qtd||'0')*Number.parseFloat(i.preco||'0'), 0));
+                    if (vt > 0) linhas.push(`Valor Total: R$ ${vt.toFixed(2)}`);
+                    linhas.push('', '✏️ Editar O.S:', linkEditar);
+                    return linhas.join('\n');
+                  };
+                  return (
+                    <div style={{ background:'#eff6ff', borderRadius:10, padding:'10px 14px', border:'1.5px solid #bfdbfe' }}>
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                        {secTitle('📧', '10 — Enviar por E-mail')}
+                        <ConfigDropdown
+                          lsKey={LS_EMAILS}
+                          campos={[
+                            { key:'nome', label:'Nome', placeholder:'Nome do destinatário...' },
+                            { key:'email', label:'E-mail', placeholder:'email@exemplo.com' },
+                          ]}
+                          currentValue={os.enviarEmail}
+                          onSelect={(item) => updateOS('enviarEmail', item.email)}
+                        />
+                      </div>
+                      <div style={{ display:'flex', gap:8, alignItems:'end' }}>
+                        <div style={{ flex:1 }}>
+                          {fieldLbl('E-mail do destinatário')}
+                          <input className={styles.campoInput} type="email" placeholder="email@exemplo.com" value={os.enviarEmail || ''} onChange={e => updateOS('enviarEmail', e.target.value)} />
+                        </div>
+                        <a
+                          href={os.enviarEmail ? `mailto:${encodeURIComponent(os.enviarEmail)}?subject=${encodeURIComponent(`O.S Assistência Técnica — Nº ${os.numero || ''}`)}&body=${encodeURIComponent(resumoOS())}` : '#'}
+                          onClick={e => { if (!os.enviarEmail) e.preventDefault(); }}
+                          style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', background: os.enviarEmail ? '#2563eb' : '#9ca3af', color:'#fff', borderRadius:8, fontWeight:700, fontSize:12, textDecoration:'none', whiteSpace:'nowrap', height:36, cursor: os.enviarEmail ? 'pointer' : 'not-allowed' }}>
+                          📧 Enviar
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 11 — COMPARTILHAR POR WHATSAPP */}
+                {(() => {
+                  const LS_WHATSAPP = 'sm_cad_whatsapp_os';
+                  const modeloCamposWA = OS_MODELOS_SHARE['os_assistencia_tecnica']?.campos || [];
+                  const sidWA = _saveOSDataForShare('os_assistencia_tecnica', os, modeloCamposWA);
+                  const linkEditarWA = globalThis.location.origin + '/os-publica/os_assistencia_tecnica' + (sidWA ? '?id=' + sidWA : '');
+                  const resumoWA = () => {
+                    const linhas = [`*O.S Assistência Técnica — Nº ${os.numero || '...'}*`, ''];
+                    if (os.maquinaNome) linhas.push(`*Máquina:* ${os.maquinaNumero ? `Nº ${os.maquinaNumero} — ` : ''}${os.maquinaNome} (${os.maquinaCodigo || '-'})`);
+                    if (os.maquinaSetor) linhas.push(`*Setor:* ${os.maquinaSetor}`);
+                    if (os.tecnicoNome) linhas.push(`*Técnico:* ${os.tecnicoNome}`);
+                    if (os.tecnicoDescricao) linhas.push(`*Descrição:* ${os.tecnicoDescricao}`);
+                    if (os.prestadoraNome) linhas.push(`*Prestadora:* ${os.prestadoraNome} — CNPJ: ${os.prestadoraCnpj || '-'}`);
+                    if (os.prazoData) linhas.push(`*Prazo:* ${os.prazoData}`);
+                    if (os.gestorNome) linhas.push(`*Gestor:* ${os.gestorNome} (${os.gestorCargo || '-'})`);
+                    if (os.status) linhas.push(`*Status:* ${os.status}`);
+                    if (os.prioridade) linhas.push(`*Prioridade:* ${os.prioridade}`);
+                    const vt = (Number.parseFloat(os.valorServico || '0') + itensMat.reduce((a: number, i: {qtd:string;preco:string}) => a + Number.parseFloat(i.qtd||'0')*Number.parseFloat(i.preco||'0'), 0));
+                    if (vt > 0) linhas.push(`*Valor Total:* R$ ${vt.toFixed(2)}`);
+                    linhas.push('', '✏️ *Editar O.S:*', linkEditarWA);
+                    return linhas.join('\n');
+                  };
+                  const foneNum = (os.enviarWhatsapp || '').replace(/\D/g, '');
+                  const fone55 = foneNum.length > 0 && !foneNum.startsWith('55') ? '55' + foneNum : foneNum;
+                  return (
+                    <div style={{ background:'#f0fdf4', borderRadius:10, padding:'10px 14px', border:'1.5px solid #bbf7d0' }}>
+                      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                        {secTitle('💬', '11 — Enviar por WhatsApp')}
+                        <ConfigDropdown
+                          lsKey={LS_WHATSAPP}
+                          campos={[
+                            { key:'nome', label:'Nome', placeholder:'Nome do contato...' },
+                            { key:'telefone', label:'WhatsApp', placeholder:'(00) 00000-0000' },
+                          ]}
+                          currentValue={os.enviarWhatsapp}
+                          onSelect={(item) => updateOS('enviarWhatsapp', item.telefone)}
+                        />
+                      </div>
+                      <div style={{ display:'flex', gap:8, alignItems:'end' }}>
+                        <div style={{ flex:1 }}>
+                          {fieldLbl('Número do WhatsApp')}
+                          <input className={styles.campoInput} placeholder="(00) 00000-0000" value={os.enviarWhatsapp || ''} onChange={e => updateOS('enviarWhatsapp', e.target.value)} />
+                        </div>
+                        <a
+                          href={fone55 ? `https://wa.me/${fone55}?text=${encodeURIComponent(resumoWA())}` : '#'}
+                          target="_blank" rel="noopener noreferrer"
+                          onClick={e => { if (!fone55) e.preventDefault(); }}
+                          style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', background: fone55 ? '#16a34a' : '#9ca3af', color:'#fff', borderRadius:8, fontWeight:700, fontSize:12, textDecoration:'none', whiteSpace:'nowrap', height:36, cursor: fone55 ? 'pointer' : 'not-allowed' }}>
+                          💬 Enviar
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* 12 — COMPARTILHAR + CONFIG */}
+                <OSShareSection modelo="os_assistencia_tecnica" secTitleFn={secTitle} osData={os} />
+
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      /* ═══════════════════════════════════════════════════════════════
+         O.S GERAL
+         ═══════════════════════════════════════════════════════════════ */
+      case 'ordem_servico': {
+        const os = val || {};
+        const updateOS = (field: string, v: unknown) => setResposta(bloco.uid, { ...os, [field]: v });
+        if (!os._tipo) setTimeout(() => updateOS('_tipo', 'ordem_servico'), 0);
+        if (!os.numero) {
+          const cont = Number.parseInt(localStorage.getItem('sm_contador_os_geral') || '0', 10) + 1;
+          localStorage.setItem('sm_contador_os_geral', String(cont));
+          const h = new Date();
+          setTimeout(() => updateOS('numero', `OSG-${h.getFullYear()}${String(h.getMonth()+1).padStart(2,'0')}${String(h.getDate()).padStart(2,'0')}-${String(cont).padStart(4,'0')}`), 0);
+        }
+        const secT = (icon: string, txt: string) => (<div style={{ fontSize:11, fontWeight:900, color:'#1e40af', textTransform:'uppercase', letterSpacing:0.8, borderBottom:'2px solid #bfdbfe', paddingBottom:4, marginBottom:8 }}>{icon} {txt}</div>);
+        const fLbl = (txt: string) => (<label style={{ fontSize:10, fontWeight:700, color:'#6b7280', display:'block', marginBottom:3 }}>{txt}</label>);
+        return (
+          <div key={bloco.uid} className={styles.campo}>
+            <label className={styles.campoLabel}>{def.icone} {bloco.label || def.nome}</label>
+            <div style={{ border:'2px solid #2563eb', borderRadius:14, overflow:'hidden', marginTop:8, background:'#fff' }}>
+              <div style={{ background:'linear-gradient(135deg,#2563eb,#1e40af)', color:'#fff', padding:'14px 16px', textAlign:'center' }}>
+                <div style={{ fontSize:15, fontWeight:900, textTransform:'uppercase', letterSpacing:1.5 }}>📋 ORDEM DE SERVIÇO</div>
+                <div style={{ fontSize:12, opacity:0.9, marginTop:2 }}>GERAL</div>
+                <div style={{ fontSize:11, opacity:0.8, marginTop:4, fontFamily:'monospace', fontWeight:700 }}>Nº {os.numero || '...'}</div>
+              </div>
+              <div style={{ padding:16, display:'flex', flexDirection:'column', gap:14 }}>
+                {/* 1 — Solicitante */}
+                <div style={{ background:'#eff6ff', borderRadius:10, padding:'10px 14px', border:'1.5px solid #bfdbfe' }}>
+                  {secT('👤', '1 — Solicitante')}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <div>{fLbl('Nome')}<input className={styles.campoInput} placeholder="Nome do solicitante..." value={os.solicitanteNome || ''} onChange={e => updateOS('solicitanteNome', e.target.value)} /></div>
+                    <div>{fLbl('Setor / Unidade')}<input className={styles.campoInput} placeholder="Setor..." value={os.solicitanteSetor || ''} onChange={e => updateOS('solicitanteSetor', e.target.value)} /></div>
+                  </div>
+                  <div style={{ marginTop:8 }}>{fLbl('Telefone / Ramal')}<input className={styles.campoInput} placeholder="(00) 00000-0000" value={os.solicitanteTelefone || ''} onChange={e => updateOS('solicitanteTelefone', e.target.value)} /></div>
+                </div>
+                {/* 2 — Descrição */}
+                <div style={{ background:'#f8fafc', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e2e8f0' }}>
+                  {secT('📝', '2 — Descrição do Serviço')}
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
+                    {fLbl('Descreva o serviço solicitado')}
+                    <MicButton onResult={t => updateOS('descricao', (os.descricao || '') + (os.descricao ? ' ' : '') + t)} />
+                  </div>
+                  <textarea className={styles.campoInput} rows={4} placeholder="Descreva detalhadamente..." value={os.descricao || ''} onChange={e => updateOS('descricao', e.target.value)} />
+                </div>
+                {/* 3 — Local */}
+                <div style={{ background:'#fefce8', borderRadius:10, padding:'10px 14px', border:'1.5px solid #fef08a' }}>
+                  {secT('📍', '3 — Local')}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <div>{fLbl('Bloco / Área')}<input className={styles.campoInput} placeholder="Bloco A, Sala 3..." value={os.local || ''} onChange={e => updateOS('local', e.target.value)} /></div>
+                    <div>{fLbl('Andar / Pavimento')}<input className={styles.campoInput} placeholder="Térreo, 2º andar..." value={os.andar || ''} onChange={e => updateOS('andar', e.target.value)} /></div>
+                  </div>
+                </div>
+                {/* 4 — Responsável */}
+                <div style={{ background:'#f0f4ff', borderRadius:10, padding:'10px 14px', border:'1.5px solid #c7d2fe' }}>
+                  {secT('👷', '4 — Responsável pela Execução')}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <div>{fLbl('Nome')}<input className={styles.campoInput} placeholder="Responsável..." value={os.responsavelNome || ''} onChange={e => updateOS('responsavelNome', e.target.value)} /></div>
+                    <div>{fLbl('Cargo / Função')}<input className={styles.campoInput} placeholder="Técnico, Encarregado..." value={os.responsavelCargo || ''} onChange={e => updateOS('responsavelCargo', e.target.value)} /></div>
+                  </div>
+                </div>
+                {/* 5 — Prazo */}
+                <div style={{ background:'#fff7ed', borderRadius:10, padding:'10px 14px', border:'1.5px solid #fed7aa' }}>
+                  {secT('📅', '5 — Prazo')}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <div>{fLbl('Data Prevista')}<input className={styles.campoInput} type="date" value={os.prazoData || ''} onChange={e => updateOS('prazoData', e.target.value)} /></div>
+                    <div>{fLbl('Observação')}<input className={styles.campoInput} placeholder="Dias úteis..." value={os.prazoObs || ''} onChange={e => updateOS('prazoObs', e.target.value)} /></div>
+                  </div>
+                </div>
+                {/* 6 — Status / Prioridade */}
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  <div style={{ background:'#f8fafc', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e2e8f0' }}>
+                    {fLbl('Status')}
+                    <select className={styles.campoInput} value={os.status || ''} onChange={e => updateOS('status', e.target.value)} style={{ fontWeight:700 }}>
+                      <option value="">Selecione...</option>
+                      <option value="Aberta">📂 Aberta</option>
+                      <option value="Em andamento">🔄 Em andamento</option>
+                      <option value="Concluída">✅ Concluída</option>
+                      <option value="Cancelada">❌ Cancelada</option>
+                    </select>
+                  </div>
+                  <div style={{ background:'#f8fafc', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e2e8f0' }}>
+                    {fLbl('Prioridade')}
+                    <select className={styles.campoInput} value={os.prioridade || ''} onChange={e => updateOS('prioridade', e.target.value)} style={{ fontWeight:700 }}>
+                      <option value="">Selecione...</option>
+                      <option value="Baixa">🟢 Baixa</option>
+                      <option value="Média">🟡 Média</option>
+                      <option value="Alta">🟠 Alta</option>
+                      <option value="Urgente">🔴 Urgente</option>
+                    </select>
+                  </div>
+                </div>
+                {/* 7 — Observações */}
+                <div style={{ background:'#f8fafc', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e2e8f0' }}>
+                  {secT('📎', '7 — Observações')}
+                  <textarea className={styles.campoInput} rows={2} placeholder="Observações adicionais..." value={os.observacoes || ''} onChange={e => updateOS('observacoes', e.target.value)} />
+                </div>
+                {/* Assinaturas */}
+                <div style={{ background:'#f9fafb', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e5e7eb' }}>
+                  <div style={{ fontSize:10, fontWeight:900, color:'#4b5563', textTransform:'uppercase', letterSpacing:0.5, marginBottom:8, textAlign:'center' }}>✍️ Assinaturas</div>
+                  <div style={{ display:'flex', gap:12 }}>
+                    <AssinaturaInline label="Solicitante" value={os.assinaturaSolicitante || null} onChange={v => updateOS('assinaturaSolicitante', v)} />
+                    <AssinaturaInline label="Responsável" value={os.assinaturaResponsavel || null} onChange={v => updateOS('assinaturaResponsavel', v)} />
+                  </div>
+                </div>
+                <OSShareSection modelo="ordem_servico" secTitleFn={secT} osData={os} />
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      /* ═══════════════════════════════════════════════════════════════
+         O.S MANUTENÇÃO CORRETIVA
+         ═══════════════════════════════════════════════════════════════ */
+      case 'os_manutencao_corretiva': {
+        const os = val || {};
+        const updateOS = (field: string, v: unknown) => setResposta(bloco.uid, { ...os, [field]: v });
+        if (!os._tipo) setTimeout(() => updateOS('_tipo', 'os_manutencao_corretiva'), 0);
+        if (!os.numero) {
+          const cont = Number.parseInt(localStorage.getItem('sm_contador_os_mc') || '0', 10) + 1;
+          localStorage.setItem('sm_contador_os_mc', String(cont));
+          const h = new Date();
+          setTimeout(() => updateOS('numero', `OSMC-${h.getFullYear()}${String(h.getMonth()+1).padStart(2,'0')}${String(h.getDate()).padStart(2,'0')}-${String(cont).padStart(4,'0')}`), 0);
+        }
+        const secT = (icon: string, txt: string) => (<div style={{ fontSize:11, fontWeight:900, color:'#dc2626', textTransform:'uppercase', letterSpacing:0.8, borderBottom:'2px solid #fecaca', paddingBottom:4, marginBottom:8 }}>{icon} {txt}</div>);
+        const fLbl = (txt: string) => (<label style={{ fontSize:10, fontWeight:700, color:'#6b7280', display:'block', marginBottom:3 }}>{txt}</label>);
+        return (
+          <div key={bloco.uid} className={styles.campo}>
+            <label className={styles.campoLabel}>{def.icone} {bloco.label || def.nome}</label>
+            <div style={{ border:'2px solid #dc2626', borderRadius:14, overflow:'hidden', marginTop:8, background:'#fff' }}>
+              <div style={{ background:'linear-gradient(135deg,#dc2626,#991b1b)', color:'#fff', padding:'14px 16px', textAlign:'center' }}>
+                <div style={{ fontSize:15, fontWeight:900, textTransform:'uppercase', letterSpacing:1.5 }}>🔧 ORDEM DE SERVIÇO</div>
+                <div style={{ fontSize:12, opacity:0.9, marginTop:2 }}>MANUTENÇÃO CORRETIVA</div>
+                <div style={{ fontSize:11, opacity:0.8, marginTop:4, fontFamily:'monospace', fontWeight:700 }}>Nº {os.numero || '...'}</div>
+              </div>
+              <div style={{ padding:16, display:'flex', flexDirection:'column', gap:14 }}>
+                {/* 1 — Equipamento */}
+                <div style={{ background:'#fef2f2', borderRadius:10, padding:'10px 14px', border:'1.5px solid #fecaca' }}>
+                  {secT('🖥️', '1 — Equipamento com Defeito')}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <div>{fLbl('Nome do Equipamento')}<input className={styles.campoInput} placeholder="Ex: Bomba d\'água..." value={os.equipNome || ''} onChange={e => updateOS('equipNome', e.target.value)} /></div>
+                    <div>{fLbl('Código / Patrimônio')}<input className={styles.campoInput} placeholder="EQ-001" value={os.equipCodigo || ''} onChange={e => updateOS('equipCodigo', e.target.value)} /></div>
+                  </div>
+                  <div style={{ marginTop:8 }}>
+                    {fLbl('Localização do Equipamento')}
+                    <input className={styles.campoInput} placeholder="Bloco A, Subsolo..." value={os.equipLocal || ''} onChange={e => updateOS('equipLocal', e.target.value)} />
+                  </div>
+                </div>
+                {/* 2 — Defeito reportado */}
+                <div style={{ background:'#fff7ed', borderRadius:10, padding:'10px 14px', border:'1.5px solid #fed7aa' }}>
+                  {secT('⚠️', '2 — Defeito Reportado')}
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
+                    {fLbl('Descrição do defeito / falha')}
+                    <MicButton onResult={t => updateOS('defeito', (os.defeito || '') + (os.defeito ? ' ' : '') + t)} />
+                  </div>
+                  <textarea className={styles.campoInput} rows={3} placeholder="Descreva o defeito encontrado..." value={os.defeito || ''} onChange={e => updateOS('defeito', e.target.value)} />
+                  <div style={{ marginTop:8 }}>
+                    {fLbl('Data / Hora da Parada')}
+                    <input className={styles.campoInput} type="datetime-local" value={os.dataParada || ''} onChange={e => updateOS('dataParada', e.target.value)} />
+                  </div>
+                </div>
+                {/* 3 — Causa */}
+                <div style={{ background:'#fef3c7', borderRadius:10, padding:'10px 14px', border:'1.5px solid #fde68a' }}>
+                  {secT('🔍', '3 — Diagnóstico / Causa')}
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
+                    {fLbl('Causa raiz identificada')}
+                    <MicButton onResult={t => updateOS('causa', (os.causa || '') + (os.causa ? ' ' : '') + t)} />
+                  </div>
+                  <textarea className={styles.campoInput} rows={3} placeholder="Causa identificada..." value={os.causa || ''} onChange={e => updateOS('causa', e.target.value)} />
+                </div>
+                {/* 4 — Ação corretiva */}
+                <div style={{ background:'#f0fdf4', borderRadius:10, padding:'10px 14px', border:'1.5px solid #bbf7d0' }}>
+                  {secT('🛠️', '4 — Ação Corretiva Realizada')}
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
+                    {fLbl('Serviço executado')}
+                    <MicButton onResult={t => updateOS('acaoCorretiva', (os.acaoCorretiva || '') + (os.acaoCorretiva ? ' ' : '') + t)} />
+                  </div>
+                  <textarea className={styles.campoInput} rows={3} placeholder="O que foi feito para corrigir..." value={os.acaoCorretiva || ''} onChange={e => updateOS('acaoCorretiva', e.target.value)} />
+                </div>
+                {/* 5 — Peças / Materiais */}
+                <div style={{ background:'#faf5ff', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e9d5ff' }}>
+                  {secT('🛒', '5 — Peças e Materiais Utilizados')}
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
+                    {fLbl('Liste as peças/materiais')}
+                    <MicButton onResult={t => updateOS('pecas', (os.pecas || '') + (os.pecas ? ' ' : '') + t)} />
+                  </div>
+                  <textarea className={styles.campoInput} rows={2} placeholder="Peça X, Material Y..." value={os.pecas || ''} onChange={e => updateOS('pecas', e.target.value)} />
+                </div>
+                {/* 6 — Técnico */}
+                <div style={{ background:'#f0f4ff', borderRadius:10, padding:'10px 14px', border:'1.5px solid #c7d2fe' }}>
+                  {secT('👷', '6 — Técnico Responsável')}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <div>{fLbl('Nome')}<input className={styles.campoInput} placeholder="Nome do técnico..." value={os.tecnicoNome || ''} onChange={e => updateOS('tecnicoNome', e.target.value)} /></div>
+                    <div>{fLbl('Empresa')}<input className={styles.campoInput} placeholder="Empresa / Próprio..." value={os.tecnicoEmpresa || ''} onChange={e => updateOS('tecnicoEmpresa', e.target.value)} /></div>
+                  </div>
+                </div>
+                {/* 7 — Tempo */}
+                <div style={{ background:'#f8fafc', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e2e8f0' }}>
+                  {secT('⏱️', '7 — Tempo de Execução')}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8 }}>
+                    <div>{fLbl('Início')}<input className={styles.campoInput} type="datetime-local" value={os.tempoInicio || ''} onChange={e => updateOS('tempoInicio', e.target.value)} /></div>
+                    <div>{fLbl('Fim')}<input className={styles.campoInput} type="datetime-local" value={os.tempoFim || ''} onChange={e => updateOS('tempoFim', e.target.value)} /></div>
+                    <div>{fLbl('Total (horas)')}<input className={styles.campoInput} placeholder="Ex: 2h30" value={os.tempoTotal || ''} onChange={e => updateOS('tempoTotal', e.target.value)} /></div>
+                  </div>
+                </div>
+                {/* 8 — Status / Prioridade */}
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  <div style={{ background:'#f8fafc', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e2e8f0' }}>
+                    {fLbl('Status')}
+                    <select className={styles.campoInput} value={os.status || ''} onChange={e => updateOS('status', e.target.value)} style={{ fontWeight:700 }}>
+                      <option value="">Selecione...</option>
+                      <option value="Aguardando">⏳ Aguardando</option>
+                      <option value="Em execução">🔄 Em execução</option>
+                      <option value="Aguardando peça">📦 Aguardando peça</option>
+                      <option value="Concluído">✅ Concluído</option>
+                      <option value="Reincidente">🔁 Reincidente</option>
+                    </select>
+                  </div>
+                  <div style={{ background:'#f8fafc', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e2e8f0' }}>
+                    {fLbl('Prioridade')}
+                    <select className={styles.campoInput} value={os.prioridade || ''} onChange={e => updateOS('prioridade', e.target.value)} style={{ fontWeight:700 }}>
+                      <option value="">Selecione...</option>
+                      <option value="Baixa">🟢 Baixa</option>
+                      <option value="Média">🟡 Média</option>
+                      <option value="Alta">🟠 Alta</option>
+                      <option value="Urgente">🔴 Urgente</option>
+                    </select>
+                  </div>
+                </div>
+                {/* Assinaturas */}
+                <div style={{ background:'#f9fafb', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e5e7eb' }}>
+                  <div style={{ fontSize:10, fontWeight:900, color:'#4b5563', textTransform:'uppercase', letterSpacing:0.5, marginBottom:8, textAlign:'center' }}>✍️ Assinaturas</div>
+                  <div style={{ display:'flex', gap:12 }}>
+                    <AssinaturaInline label="Técnico" value={os.assinaturaTecnico || null} onChange={v => updateOS('assinaturaTecnico', v)} />
+                    <AssinaturaInline label="Aprovador" value={os.assinaturaAprovador || null} onChange={v => updateOS('assinaturaAprovador', v)} />
+                  </div>
+                </div>
+                <OSShareSection modelo="os_manutencao_corretiva" secTitleFn={secT} osData={os} />
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      /* ═══════════════════════════════════════════════════════════════
+         O.S MANUTENÇÃO PREVENTIVA
+         ═══════════════════════════════════════════════════════════════ */
+      case 'os_manutencao_preventiva': {
+        const os = val || {};
+        const updateOS = (field: string, v: unknown) => setResposta(bloco.uid, { ...os, [field]: v });
+        if (!os._tipo) setTimeout(() => updateOS('_tipo', 'os_manutencao_preventiva'), 0);
+        if (!os.numero) {
+          const cont = Number.parseInt(localStorage.getItem('sm_contador_os_mp') || '0', 10) + 1;
+          localStorage.setItem('sm_contador_os_mp', String(cont));
+          const h = new Date();
+          setTimeout(() => updateOS('numero', `OSMP-${h.getFullYear()}${String(h.getMonth()+1).padStart(2,'0')}${String(h.getDate()).padStart(2,'0')}-${String(cont).padStart(4,'0')}`), 0);
+        }
+        // Itens do checklist preventivo
+        const itensCheck: Array<{ item: string; ok: string; obs: string }> = os.checklistItens || [];
+        const addCheck = () => updateOS('checklistItens', [...itensCheck, { item: '', ok: '', obs: '' }]);
+        const updateCheck = (idx: number, field: string, v: string) => { const novo = [...itensCheck]; novo[idx] = { ...novo[idx], [field]: v }; updateOS('checklistItens', novo); };
+        const removeCheck = (idx: number) => updateOS('checklistItens', itensCheck.filter((_, i) => i !== idx));
+
+        const secT = (icon: string, txt: string) => (<div style={{ fontSize:11, fontWeight:900, color:'#16a34a', textTransform:'uppercase', letterSpacing:0.8, borderBottom:'2px solid #bbf7d0', paddingBottom:4, marginBottom:8 }}>{icon} {txt}</div>);
+        const fLbl = (txt: string) => (<label style={{ fontSize:10, fontWeight:700, color:'#6b7280', display:'block', marginBottom:3 }}>{txt}</label>);
+        return (
+          <div key={bloco.uid} className={styles.campo}>
+            <label className={styles.campoLabel}>{def.icone} {bloco.label || def.nome}</label>
+            <div style={{ border:'2px solid #16a34a', borderRadius:14, overflow:'hidden', marginTop:8, background:'#fff' }}>
+              <div style={{ background:'linear-gradient(135deg,#16a34a,#15803d)', color:'#fff', padding:'14px 16px', textAlign:'center' }}>
+                <div style={{ fontSize:15, fontWeight:900, textTransform:'uppercase', letterSpacing:1.5 }}>🔄 ORDEM DE SERVIÇO</div>
+                <div style={{ fontSize:12, opacity:0.9, marginTop:2 }}>MANUTENÇÃO PREVENTIVA</div>
+                <div style={{ fontSize:11, opacity:0.8, marginTop:4, fontFamily:'monospace', fontWeight:700 }}>Nº {os.numero || '...'}</div>
+              </div>
+              <div style={{ padding:16, display:'flex', flexDirection:'column', gap:14 }}>
+                {/* 1 — Equipamento */}
+                <div style={{ background:'#f0fdf4', borderRadius:10, padding:'10px 14px', border:'1.5px solid #bbf7d0' }}>
+                  {secT('🖥️', '1 — Equipamento')}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <div>{fLbl('Nome')}<input className={styles.campoInput} placeholder="Equipamento..." value={os.equipNome || ''} onChange={e => updateOS('equipNome', e.target.value)} /></div>
+                    <div>{fLbl('Código')}<input className={styles.campoInput} placeholder="EQ-001" value={os.equipCodigo || ''} onChange={e => updateOS('equipCodigo', e.target.value)} /></div>
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:8 }}>
+                    <div>{fLbl('Localização')}<input className={styles.campoInput} placeholder="Bloco, Andar..." value={os.equipLocal || ''} onChange={e => updateOS('equipLocal', e.target.value)} /></div>
+                    <div>{fLbl('Marca / Modelo')}<input className={styles.campoInput} placeholder="Marca..." value={os.equipMarca || ''} onChange={e => updateOS('equipMarca', e.target.value)} /></div>
+                  </div>
+                </div>
+                {/* 2 — Tipo de Manutenção */}
+                <div style={{ background:'#eff6ff', borderRadius:10, padding:'10px 14px', border:'1.5px solid #bfdbfe' }}>
+                  {secT('📋', '2 — Tipo de Manutenção Preventiva')}
+                  {fLbl('Selecione o tipo')}
+                  <select className={styles.campoInput} value={os.tipoManutencao || ''} onChange={e => updateOS('tipoManutencao', e.target.value)} style={{ fontWeight:700 }}>
+                    <option value="">Selecione...</option>
+                    <option value="Lubrificação">🛢️ Lubrificação</option>
+                    <option value="Limpeza">🧹 Limpeza Técnica</option>
+                    <option value="Calibração">📐 Calibração</option>
+                    <option value="Inspeção visual">👁️ Inspeção Visual</option>
+                    <option value="Troca de peça">🔩 Troca de Peça Programada</option>
+                    <option value="Teste funcional">⚡ Teste Funcional</option>
+                    <option value="Ajuste">🔧 Ajuste / Regulagem</option>
+                    <option value="Outro">📝 Outro</option>
+                  </select>
+                </div>
+                {/* 3 — Checklist de Itens */}
+                <div style={{ background:'#fefce8', borderRadius:10, padding:'10px 14px', border:'1.5px solid #fef08a' }}>
+                  {secT('✅', '3 — Checklist de Verificação')}
+                  {itensCheck.map((it, idx) => (
+                    <div key={`ckp-${idx}`} style={{ display:'grid', gridTemplateColumns:'2fr 80px 2fr 30px', gap:6, marginBottom:6, alignItems:'end' }}>
+                      <div>{fLbl('Item')}<input className={styles.campoInput} placeholder="Verificar..." value={it.item} onChange={e => updateCheck(idx, 'item', e.target.value)} /></div>
+                      <div>{fLbl('OK?')}
+                        <select className={styles.campoInput} value={it.ok} onChange={e => updateCheck(idx, 'ok', e.target.value)} style={{ fontWeight:700 }}>
+                          <option value="">-</option>
+                          <option value="OK">✅ OK</option>
+                          <option value="NOK">❌ NOK</option>
+                          <option value="NA">➖ N/A</option>
+                        </select>
+                      </div>
+                      <div>{fLbl('Obs')}<input className={styles.campoInput} placeholder="Obs..." value={it.obs} onChange={e => updateCheck(idx, 'obs', e.target.value)} /></div>
+                      <button type="button" onClick={() => removeCheck(idx)} style={{ background:'#fee2e2', border:'none', borderRadius:6, color:'#dc2626', fontWeight:900, cursor:'pointer', height:32 }}>✕</button>
+                    </div>
+                  ))}
+                  <button type="button" onClick={addCheck} style={{ background:'#dcfce7', border:'1.5px dashed #16a34a', borderRadius:8, padding:'6px 14px', color:'#15803d', fontWeight:700, fontSize:12, cursor:'pointer', width:'100%' }}>+ Adicionar Item</button>
+                </div>
+                {/* 4 — Frequência */}
+                <div style={{ background:'#faf5ff', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e9d5ff' }}>
+                  {secT('🔁', '4 — Frequência / Periodicidade')}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <div>
+                      {fLbl('Frequência')}
+                      <select className={styles.campoInput} value={os.frequencia || ''} onChange={e => updateOS('frequencia', e.target.value)} style={{ fontWeight:700 }}>
+                        <option value="">Selecione...</option>
+                        <option value="Diária">Diária</option>
+                        <option value="Semanal">Semanal</option>
+                        <option value="Quinzenal">Quinzenal</option>
+                        <option value="Mensal">Mensal</option>
+                        <option value="Trimestral">Trimestral</option>
+                        <option value="Semestral">Semestral</option>
+                        <option value="Anual">Anual</option>
+                      </select>
+                    </div>
+                    <div>{fLbl('Próxima Manutenção')}<input className={styles.campoInput} type="date" value={os.proximaData || ''} onChange={e => updateOS('proximaData', e.target.value)} /></div>
+                  </div>
+                </div>
+                {/* 5 — Técnico */}
+                <div style={{ background:'#f0f4ff', borderRadius:10, padding:'10px 14px', border:'1.5px solid #c7d2fe' }}>
+                  {secT('👷', '5 — Técnico Responsável')}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <div>{fLbl('Nome')}<input className={styles.campoInput} placeholder="Técnico..." value={os.tecnicoNome || ''} onChange={e => updateOS('tecnicoNome', e.target.value)} /></div>
+                    <div>{fLbl('Empresa')}<input className={styles.campoInput} placeholder="Empresa..." value={os.tecnicoEmpresa || ''} onChange={e => updateOS('tecnicoEmpresa', e.target.value)} /></div>
+                  </div>
+                </div>
+                {/* 6 — Observações */}
+                <div style={{ background:'#f8fafc', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e2e8f0' }}>
+                  {secT('📝', '6 — Observações')}
+                  <textarea className={styles.campoInput} rows={2} placeholder="Observações..." value={os.observacoes || ''} onChange={e => updateOS('observacoes', e.target.value)} />
+                </div>
+                {/* Status */}
+                <div style={{ background:'#f8fafc', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e2e8f0' }}>
+                  {fLbl('Status')}
+                  <select className={styles.campoInput} value={os.status || ''} onChange={e => updateOS('status', e.target.value)} style={{ fontWeight:700 }}>
+                    <option value="">Selecione...</option>
+                    <option value="Programada">📅 Programada</option>
+                    <option value="Em execução">🔄 Em execução</option>
+                    <option value="Concluída">✅ Concluída</option>
+                    <option value="Adiada">⏸️ Adiada</option>
+                  </select>
+                </div>
+                {/* Assinaturas */}
+                <div style={{ background:'#f9fafb', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e5e7eb' }}>
+                  <div style={{ fontSize:10, fontWeight:900, color:'#4b5563', textTransform:'uppercase', letterSpacing:0.5, marginBottom:8, textAlign:'center' }}>✍️ Assinaturas</div>
+                  <div style={{ display:'flex', gap:12 }}>
+                    <AssinaturaInline label="Técnico" value={os.assinaturaTecnico || null} onChange={v => updateOS('assinaturaTecnico', v)} />
+                    <AssinaturaInline label="Supervisor" value={os.assinaturaSupervisor || null} onChange={v => updateOS('assinaturaSupervisor', v)} />
+                  </div>
+                </div>
+                <OSShareSection modelo="os_manutencao_preventiva" secTitleFn={secT} osData={os} />
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      /* ═══════════════════════════════════════════════════════════════
+         O.S INSTALAÇÃO
+         ═══════════════════════════════════════════════════════════════ */
+      case 'os_instalacao': {
+        const os = val || {};
+        const updateOS = (field: string, v: unknown) => setResposta(bloco.uid, { ...os, [field]: v });
+        if (!os._tipo) setTimeout(() => updateOS('_tipo', 'os_instalacao'), 0);
+        if (!os.numero) {
+          const cont = Number.parseInt(localStorage.getItem('sm_contador_os_inst') || '0', 10) + 1;
+          localStorage.setItem('sm_contador_os_inst', String(cont));
+          const h = new Date();
+          setTimeout(() => updateOS('numero', `OSIN-${h.getFullYear()}${String(h.getMonth()+1).padStart(2,'0')}${String(h.getDate()).padStart(2,'0')}-${String(cont).padStart(4,'0')}`), 0);
+        }
+        const secT = (icon: string, txt: string) => (<div style={{ fontSize:11, fontWeight:900, color:'#0891b2', textTransform:'uppercase', letterSpacing:0.8, borderBottom:'2px solid #a5f3fc', paddingBottom:4, marginBottom:8 }}>{icon} {txt}</div>);
+        const fLbl = (txt: string) => (<label style={{ fontSize:10, fontWeight:700, color:'#6b7280', display:'block', marginBottom:3 }}>{txt}</label>);
+        return (
+          <div key={bloco.uid} className={styles.campo}>
+            <label className={styles.campoLabel}>{def.icone} {bloco.label || def.nome}</label>
+            <div style={{ border:'2px solid #0891b2', borderRadius:14, overflow:'hidden', marginTop:8, background:'#fff' }}>
+              <div style={{ background:'linear-gradient(135deg,#0891b2,#0e7490)', color:'#fff', padding:'14px 16px', textAlign:'center' }}>
+                <div style={{ fontSize:15, fontWeight:900, textTransform:'uppercase', letterSpacing:1.5 }}>📦 ORDEM DE SERVIÇO</div>
+                <div style={{ fontSize:12, opacity:0.9, marginTop:2 }}>INSTALAÇÃO</div>
+                <div style={{ fontSize:11, opacity:0.8, marginTop:4, fontFamily:'monospace', fontWeight:700 }}>Nº {os.numero || '...'}</div>
+              </div>
+              <div style={{ padding:16, display:'flex', flexDirection:'column', gap:14 }}>
+                {/* 1 — O que será instalado */}
+                <div style={{ background:'#ecfeff', borderRadius:10, padding:'10px 14px', border:'1.5px solid #a5f3fc' }}>
+                  {secT('📦', '1 — Equipamento / Material a Instalar')}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <div>{fLbl('Nome / Descrição')}<input className={styles.campoInput} placeholder="Ex: Ar condicionado..." value={os.itemNome || ''} onChange={e => updateOS('itemNome', e.target.value)} /></div>
+                    <div>{fLbl('Marca / Modelo')}<input className={styles.campoInput} placeholder="Samsung, LG..." value={os.itemModelo || ''} onChange={e => updateOS('itemModelo', e.target.value)} /></div>
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:8 }}>
+                    <div>{fLbl('Nº de Série')}<input className={styles.campoInput} placeholder="SN-000..." value={os.itemSerie || ''} onChange={e => updateOS('itemSerie', e.target.value)} /></div>
+                    <div>{fLbl('Quantidade')}<input className={styles.campoInput} type="number" min={1} placeholder="1" value={os.itemQtd || ''} onChange={e => updateOS('itemQtd', e.target.value)} /></div>
+                  </div>
+                </div>
+                {/* 2 — Local de Instalação */}
+                <div style={{ background:'#fefce8', borderRadius:10, padding:'10px 14px', border:'1.5px solid #fef08a' }}>
+                  {secT('📍', '2 — Local de Instalação')}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <div>{fLbl('Bloco / Área')}<input className={styles.campoInput} placeholder="Bloco A, Sala 3..." value={os.localBloco || ''} onChange={e => updateOS('localBloco', e.target.value)} /></div>
+                    <div>{fLbl('Andar / Pavimento')}<input className={styles.campoInput} placeholder="Térreo..." value={os.localAndar || ''} onChange={e => updateOS('localAndar', e.target.value)} /></div>
+                  </div>
+                  <div style={{ marginTop:8 }}>
+                    {fLbl('Detalhes do ponto de instalação')}
+                    <textarea className={styles.campoInput} rows={2} placeholder="Descreva o ponto exato..." value={os.localDetalhe || ''} onChange={e => updateOS('localDetalhe', e.target.value)} />
+                  </div>
+                </div>
+                {/* 3 — Requisitos */}
+                <div style={{ background:'#f0f4ff', borderRadius:10, padding:'10px 14px', border:'1.5px solid #c7d2fe' }}>
+                  {secT('⚡', '3 — Requisitos Técnicos')}
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
+                    {fLbl('Infraestrutura necessária (elétrica, hidráulica, etc.)')}
+                    <MicButton onResult={t => updateOS('requisitos', (os.requisitos || '') + (os.requisitos ? ' ' : '') + t)} />
+                  </div>
+                  <textarea className={styles.campoInput} rows={2} placeholder="Ponto elétrico 220V, tubulação..." value={os.requisitos || ''} onChange={e => updateOS('requisitos', e.target.value)} />
+                </div>
+                {/* 4 — Responsável */}
+                <div style={{ background:'#f0fdf4', borderRadius:10, padding:'10px 14px', border:'1.5px solid #bbf7d0' }}>
+                  {secT('👷', '4 — Instalador / Responsável')}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <div>{fLbl('Nome')}<input className={styles.campoInput} placeholder="Instalador..." value={os.instaladorNome || ''} onChange={e => updateOS('instaladorNome', e.target.value)} /></div>
+                    <div>{fLbl('Empresa')}<input className={styles.campoInput} placeholder="Empresa..." value={os.instaladorEmpresa || ''} onChange={e => updateOS('instaladorEmpresa', e.target.value)} /></div>
+                  </div>
+                  <div style={{ marginTop:8 }}>{fLbl('Telefone')}<input className={styles.campoInput} placeholder="(00) 00000-0000" value={os.instaladorTelefone || ''} onChange={e => updateOS('instaladorTelefone', e.target.value)} /></div>
+                </div>
+                {/* 5 — Data */}
+                <div style={{ background:'#fff7ed', borderRadius:10, padding:'10px 14px', border:'1.5px solid #fed7aa' }}>
+                  {secT('📅', '5 — Data da Instalação')}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <div>{fLbl('Data Programada')}<input className={styles.campoInput} type="date" value={os.dataInstalacao || ''} onChange={e => updateOS('dataInstalacao', e.target.value)} /></div>
+                    <div>{fLbl('Horário Previsto')}<input className={styles.campoInput} type="time" value={os.horaInstalacao || ''} onChange={e => updateOS('horaInstalacao', e.target.value)} /></div>
+                  </div>
+                </div>
+                {/* 6 — Teste de Funcionamento */}
+                <div style={{ background:'#f0fdf4', borderRadius:10, padding:'10px 14px', border:'1.5px solid #bbf7d0' }}>
+                  {secT('✅', '6 — Teste de Funcionamento')}
+                  {fLbl('Equipamento testado e funcionando?')}
+                  <div style={{ display:'flex', gap:8, marginTop:4 }}>
+                    {['Sim, OK', 'Com ressalvas', 'Não funcional'].map(opt => (
+                      <button key={opt} type="button" onClick={() => updateOS('testeFuncionamento', opt)}
+                        style={{ padding:'6px 14px', borderRadius:8, fontWeight:700, fontSize:12, border: os.testeFuncionamento === opt ? '2px solid #16a34a' : '2px solid #d1d5db', background: os.testeFuncionamento === opt ? '#dcfce7' : '#fff', color: os.testeFuncionamento === opt ? '#15803d' : '#6b7280', cursor:'pointer' }}>
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                  {os.testeFuncionamento === 'Com ressalvas' && (
+                    <div style={{ marginTop:8 }}>
+                      {fLbl('Descreva as ressalvas')}
+                      <textarea className={styles.campoInput} rows={2} placeholder="Ressalvas..." value={os.testeRessalvas || ''} onChange={e => updateOS('testeRessalvas', e.target.value)} />
+                    </div>
+                  )}
+                </div>
+                {/* Status */}
+                <div style={{ background:'#f8fafc', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e2e8f0' }}>
+                  {fLbl('Status')}
+                  <select className={styles.campoInput} value={os.status || ''} onChange={e => updateOS('status', e.target.value)} style={{ fontWeight:700 }}>
+                    <option value="">Selecione...</option>
+                    <option value="Programada">📅 Programada</option>
+                    <option value="Em instalação">🔄 Em instalação</option>
+                    <option value="Instalado">✅ Instalado</option>
+                    <option value="Cancelada">❌ Cancelada</option>
+                  </select>
+                </div>
+                {/* Assinaturas */}
+                <div style={{ background:'#f9fafb', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e5e7eb' }}>
+                  <div style={{ fontSize:10, fontWeight:900, color:'#4b5563', textTransform:'uppercase', letterSpacing:0.5, marginBottom:8, textAlign:'center' }}>✍️ Assinaturas</div>
+                  <div style={{ display:'flex', gap:12 }}>
+                    <AssinaturaInline label="Instalador" value={os.assinaturaInstalador || null} onChange={v => updateOS('assinaturaInstalador', v)} />
+                    <AssinaturaInline label="Responsável" value={os.assinaturaResponsavel || null} onChange={v => updateOS('assinaturaResponsavel', v)} />
+                  </div>
+                </div>
+                <OSShareSection modelo="os_instalacao" secTitleFn={secT} osData={os} />
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      /* ═══════════════════════════════════════════════════════════════
+         O.S VISTORIA
+         ═══════════════════════════════════════════════════════════════ */
+      case 'os_vistoria': {
+        const os = val || {};
+        const updateOS = (field: string, v: unknown) => setResposta(bloco.uid, { ...os, [field]: v });
+        if (!os._tipo) setTimeout(() => updateOS('_tipo', 'os_vistoria'), 0);
+        if (!os.numero) {
+          const cont = Number.parseInt(localStorage.getItem('sm_contador_os_vist') || '0', 10) + 1;
+          localStorage.setItem('sm_contador_os_vist', String(cont));
+          const h = new Date();
+          setTimeout(() => updateOS('numero', `OSVI-${h.getFullYear()}${String(h.getMonth()+1).padStart(2,'0')}${String(h.getDate()).padStart(2,'0')}-${String(cont).padStart(4,'0')}`), 0);
+        }
+        // Itens da vistoria
+        const itensVist: Array<{ area: string; situacao: string; obs: string }> = os.vistoriaItens || [];
+        const addVist = () => updateOS('vistoriaItens', [...itensVist, { area: '', situacao: '', obs: '' }]);
+        const updateVist = (idx: number, field: string, v: string) => { const novo = [...itensVist]; novo[idx] = { ...novo[idx], [field]: v }; updateOS('vistoriaItens', novo); };
+        const removeVist = (idx: number) => updateOS('vistoriaItens', itensVist.filter((_, i) => i !== idx));
+
+        const secT = (icon: string, txt: string) => (<div style={{ fontSize:11, fontWeight:900, color:'#7c3aed', textTransform:'uppercase', letterSpacing:0.8, borderBottom:'2px solid #e9d5ff', paddingBottom:4, marginBottom:8 }}>{icon} {txt}</div>);
+        const fLbl = (txt: string) => (<label style={{ fontSize:10, fontWeight:700, color:'#6b7280', display:'block', marginBottom:3 }}>{txt}</label>);
+        return (
+          <div key={bloco.uid} className={styles.campo}>
+            <label className={styles.campoLabel}>{def.icone} {bloco.label || def.nome}</label>
+            <div style={{ border:'2px solid #7c3aed', borderRadius:14, overflow:'hidden', marginTop:8, background:'#fff' }}>
+              <div style={{ background:'linear-gradient(135deg,#7c3aed,#6d28d9)', color:'#fff', padding:'14px 16px', textAlign:'center' }}>
+                <div style={{ fontSize:15, fontWeight:900, textTransform:'uppercase', letterSpacing:1.5 }}>🔍 ORDEM DE SERVIÇO</div>
+                <div style={{ fontSize:12, opacity:0.9, marginTop:2 }}>VISTORIA</div>
+                <div style={{ fontSize:11, opacity:0.8, marginTop:4, fontFamily:'monospace', fontWeight:700 }}>Nº {os.numero || '...'}</div>
+              </div>
+              <div style={{ padding:16, display:'flex', flexDirection:'column', gap:14 }}>
+                {/* 1 — Tipo de Vistoria */}
+                <div style={{ background:'#faf5ff', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e9d5ff' }}>
+                  {secT('📋', '1 — Tipo de Vistoria')}
+                  {fLbl('Selecione')}
+                  <select className={styles.campoInput} value={os.tipoVistoria || ''} onChange={e => updateOS('tipoVistoria', e.target.value)} style={{ fontWeight:700 }}>
+                    <option value="">Selecione...</option>
+                    <option value="Entrada">📥 Vistoria de Entrada</option>
+                    <option value="Saída">📤 Vistoria de Saída</option>
+                    <option value="Periódica">🔄 Vistoria Periódica</option>
+                    <option value="Segurança">🔒 Vistoria de Segurança</option>
+                    <option value="Estrutural">🏗️ Vistoria Estrutural</option>
+                    <option value="Elétrica">⚡ Vistoria Elétrica</option>
+                    <option value="Hidráulica">💧 Vistoria Hidráulica</option>
+                  </select>
+                </div>
+                {/* 2 — Local */}
+                <div style={{ background:'#fefce8', borderRadius:10, padding:'10px 14px', border:'1.5px solid #fef08a' }}>
+                  {secT('📍', '2 — Local / Unidade Vistoriada')}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <div>{fLbl('Bloco / Área')}<input className={styles.campoInput} placeholder="Bloco A, Apt 101..." value={os.localBloco || ''} onChange={e => updateOS('localBloco', e.target.value)} /></div>
+                    <div>{fLbl('Responsável pela Unidade')}<input className={styles.campoInput} placeholder="Nome..." value={os.localResponsavel || ''} onChange={e => updateOS('localResponsavel', e.target.value)} /></div>
+                  </div>
+                </div>
+                {/* 3 — Itens da Vistoria */}
+                <div style={{ background:'#f0fdf4', borderRadius:10, padding:'10px 14px', border:'1.5px solid #bbf7d0' }}>
+                  {secT('✅', '3 — Itens da Vistoria')}
+                  {itensVist.map((it, idx) => (
+                    <div key={`vi-${idx}`} style={{ display:'grid', gridTemplateColumns:'2fr 100px 2fr 30px', gap:6, marginBottom:6, alignItems:'end' }}>
+                      <div>{fLbl('Área / Item')}<input className={styles.campoInput} placeholder="Piso, Pintura, Elétrica..." value={it.area} onChange={e => updateVist(idx, 'area', e.target.value)} /></div>
+                      <div>{fLbl('Situação')}
+                        <select className={styles.campoInput} value={it.situacao} onChange={e => updateVist(idx, 'situacao', e.target.value)} style={{ fontWeight:700 }}>
+                          <option value="">-</option>
+                          <option value="Bom">✅ Bom</option>
+                          <option value="Regular">🟡 Regular</option>
+                          <option value="Ruim">🔴 Ruim</option>
+                          <option value="NA">➖ N/A</option>
+                        </select>
+                      </div>
+                      <div>{fLbl('Observação')}<input className={styles.campoInput} placeholder="Obs..." value={it.obs} onChange={e => updateVist(idx, 'obs', e.target.value)} /></div>
+                      <button type="button" onClick={() => removeVist(idx)} style={{ background:'#fee2e2', border:'none', borderRadius:6, color:'#dc2626', fontWeight:900, cursor:'pointer', height:32 }}>✕</button>
+                    </div>
+                  ))}
+                  <button type="button" onClick={addVist} style={{ background:'#f5f3ff', border:'1.5px dashed #7c3aed', borderRadius:8, padding:'6px 14px', color:'#6d28d9', fontWeight:700, fontSize:12, cursor:'pointer', width:'100%' }}>+ Adicionar Item da Vistoria</button>
+                </div>
+                {/* 4 — Parecer Geral */}
+                <div style={{ background:'#fff7ed', borderRadius:10, padding:'10px 14px', border:'1.5px solid #fed7aa' }}>
+                  {secT('📝', '4 — Parecer Geral')}
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:4 }}>
+                    {fLbl('Conclusão / Parecer da vistoria')}
+                    <MicButton onResult={t => updateOS('parecer', (os.parecer || '') + (os.parecer ? ' ' : '') + t)} />
+                  </div>
+                  <textarea className={styles.campoInput} rows={3} placeholder="Parecer geral da vistoria..." value={os.parecer || ''} onChange={e => updateOS('parecer', e.target.value)} />
+                </div>
+                {/* 5 — Resultado */}
+                <div style={{ background:'#faf5ff', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e9d5ff' }}>
+                  {secT('📊', '5 — Resultado')}
+                  {fLbl('Resultado da Vistoria')}
+                  <div style={{ display:'flex', gap:8, marginTop:4 }}>
+                    {['Aprovado', 'Aprovado c/ ressalvas', 'Reprovado'].map(opt => (
+                      <button key={opt} type="button" onClick={() => updateOS('resultado', opt)}
+                        style={{ padding:'6px 14px', borderRadius:8, fontWeight:700, fontSize:12, border: os.resultado === opt ? '2px solid #7c3aed' : '2px solid #d1d5db', background: os.resultado === opt ? '#f5f3ff' : '#fff', color: os.resultado === opt ? '#6d28d9' : '#6b7280', cursor:'pointer' }}>
+                        {opt === 'Aprovado' ? '✅' : opt === 'Reprovado' ? '❌' : '⚠️'} {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* 6 — Vistoriador */}
+                <div style={{ background:'#f0f4ff', borderRadius:10, padding:'10px 14px', border:'1.5px solid #c7d2fe' }}>
+                  {secT('👷', '6 — Vistoriador')}
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                    <div>{fLbl('Nome')}<input className={styles.campoInput} placeholder="Nome..." value={os.vistoriadorNome || ''} onChange={e => updateOS('vistoriadorNome', e.target.value)} /></div>
+                    <div>{fLbl('CREA / Registro')}<input className={styles.campoInput} placeholder="CREA..." value={os.vistoriadorRegistro || ''} onChange={e => updateOS('vistoriadorRegistro', e.target.value)} /></div>
+                  </div>
+                </div>
+                {/* Data */}
+                <div style={{ background:'#fff7ed', borderRadius:10, padding:'10px 14px', border:'1.5px solid #fed7aa' }}>
+                  {secT('📅', '7 — Data da Vistoria')}
+                  <input className={styles.campoInput} type="date" value={os.dataVistoria || ''} onChange={e => updateOS('dataVistoria', e.target.value)} />
+                </div>
+                {/* Assinaturas */}
+                <div style={{ background:'#f9fafb', borderRadius:10, padding:'10px 14px', border:'1.5px solid #e5e7eb' }}>
+                  <div style={{ fontSize:10, fontWeight:900, color:'#4b5563', textTransform:'uppercase', letterSpacing:0.5, marginBottom:8, textAlign:'center' }}>✍️ Assinaturas</div>
+                  <div style={{ display:'flex', gap:12 }}>
+                    <AssinaturaInline label="Vistoriador" value={os.assinaturaVistoriador || null} onChange={v => updateOS('assinaturaVistoriador', v)} />
+                    <AssinaturaInline label="Responsável" value={os.assinaturaResponsavel || null} onChange={v => updateOS('assinaturaResponsavel', v)} />
+                  </div>
+                </div>
+                <OSShareSection modelo="os_vistoria" secTitleFn={secT} osData={os} />
+              </div>
+            </div>
+          </div>
+        );
+      }
+
       case 'orcamento': {
         const orc = val || {};
         const updateORC = (field: string, v: unknown) => setResposta(bloco.uid, { ...orc, [field]: v });
@@ -2030,15 +3908,25 @@ const FormChamado: React.FC<Props> = ({
             <div className={styles.formHorarioInicio}>
               ▶ Iniciado às {formatarHora(horarioInicial)}
             </div>
-            {onRestaurarOS && osOcultos && osOcultos.length > 0 && (
-              <button
-                type="button"
-                onClick={onRestaurarOS}
-                style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 12px', background:'rgba(255,255,255,0.25)', border:'1.5px solid rgba(255,255,255,0.5)', borderRadius:8, fontSize:11, fontWeight:800, color:'#fff', cursor:'pointer', fontFamily:'inherit', marginRight:12 }}
-              >
-                <RotateCcw size={13} /> Restaurar
+            <div style={{ display:'flex', gap:6, alignItems:'center' }}>
+              <button type="button" onClick={() => setShowHistorico(true)}
+                style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 10px', background:'rgba(255,255,255,0.25)', border:'1.5px solid rgba(255,255,255,0.5)', borderRadius:8, fontSize:11, fontWeight:800, color:'#fff', cursor:'pointer', fontFamily:'inherit' }}>
+                📋 Histórico
               </button>
-            )}
+              <button type="button" onClick={() => setShowRelatorio(true)}
+                style={{ display:'flex', alignItems:'center', gap:4, padding:'4px 10px', background:'rgba(255,255,255,0.25)', border:'1.5px solid rgba(255,255,255,0.5)', borderRadius:8, fontSize:11, fontWeight:800, color:'#fff', cursor:'pointer', fontFamily:'inherit' }}>
+                📊 Relatório
+              </button>
+              {onRestaurarOS && osOcultos && osOcultos.length > 0 && (
+                <button
+                  type="button"
+                  onClick={onRestaurarOS}
+                  style={{ display:'flex', alignItems:'center', gap:5, padding:'4px 12px', background:'rgba(255,255,255,0.25)', border:'1.5px solid rgba(255,255,255,0.5)', borderRadius:8, fontSize:11, fontWeight:800, color:'#fff', cursor:'pointer', fontFamily:'inherit' }}
+                >
+                  <RotateCcw size={13} /> Restaurar
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -2125,6 +4013,239 @@ const FormChamado: React.FC<Props> = ({
           </button>
         </div>
       </div>
+
+      {/* ── MODAL HISTÓRICO ── */}
+      {showHistorico && (() => {
+        const CHAMADOS_KEY = 'manutencao_chamados_v2';
+        let todos: ChamadoManutencao[] = [];
+        try { todos = JSON.parse(localStorage.getItem(CHAMADOS_KEY) || '[]'); } catch { /* ok */ }
+        // Filtra só OS de assistência técnica (funcaoId com os_)
+        const osList = todos.filter(c => c.funcaoId?.startsWith('os_') || c.osTitulo || c.osNumero);
+        const filtro = historicoFiltro.toLowerCase();
+        const filtrados = filtro
+          ? osList.filter(c =>
+              (c.osNumero || '').toLowerCase().includes(filtro) ||
+              (c.osTitulo || '').toLowerCase().includes(filtro) ||
+              (c.funcaoNome || '').toLowerCase().includes(filtro) ||
+              (c.responsavel || '').toLowerCase().includes(filtro) ||
+              (c.protocolo || '').toLowerCase().includes(filtro) ||
+              String(c.numero).includes(filtro) ||
+              (() => { const od = Object.values(c.respostas || {}).find((r: any) => r && typeof r === 'object' && r._tipo) as any; return od && [od.tecnicoNome, od.prestadoraNome, od.maquinaNome, od.tipoManutencao, od.gestorNome].filter(Boolean).join(' ').toLowerCase().includes(filtro); })()
+            )
+          : osList;
+        return (
+          <div style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+            <div style={{ background:'#fff', borderRadius:16, width:'100%', maxWidth:600, maxHeight:'90vh', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+              <div style={{ background:'linear-gradient(135deg,#7c3aed,#4f46e5)', color:'#fff', padding:'14px 16px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <div style={{ fontSize:15, fontWeight:900 }}>📋 Histórico de O.S</div>
+                <button onClick={() => setShowHistorico(false)} style={{ background:'rgba(255,255,255,0.2)', border:'none', borderRadius:8, color:'#fff', fontSize:18, cursor:'pointer', padding:'4px 10px', fontWeight:900 }}>✕</button>
+              </div>
+              <div style={{ padding:'10px 16px', borderBottom:'1px solid #e5e7eb' }}>
+                <input
+                  placeholder="🔍 Buscar por nº, título, técnico, protocolo..."
+                  value={historicoFiltro}
+                  onChange={e => setHistoricoFiltro(e.target.value)}
+                  style={{ width:'100%', padding:'8px 12px', borderRadius:8, border:'1.5px solid #d1d5db', fontSize:13, fontFamily:'inherit' }}
+                />
+              </div>
+              <div style={{ flex:1, overflowY:'auto', padding:16 }}>
+                {filtrados.length === 0 ? (
+                  <div style={{ textAlign:'center', padding:40, color:'#9ca3af' }}>
+                    <div style={{ fontSize:40, marginBottom:8 }}>📭</div>
+                    <div style={{ fontSize:13, fontWeight:700 }}>{osList.length === 0 ? 'Nenhuma O.S enviada ainda' : 'Nenhum resultado para a busca'}</div>
+                  </div>
+                ) : (
+                  filtrados.map(c => {
+                    const data = new Date(c.criadoEm);
+                    const resps = c.respostas || {};
+                    const osData = Object.values(resps).find((r: any) => r && typeof r === 'object' && r._tipo) as any;
+                    return (
+                      <div key={c.id} style={{ background:'#f8fafc', borderRadius:10, padding:'10px 14px', marginBottom:8, border:'1px solid #e5e7eb' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                          <div>
+                            <span style={{ fontWeight:900, color:'#4f46e5', fontSize:13 }}>
+                              {c.osNumero ? `OS #${c.osNumero}` : `#${c.numero}`}
+                            </span>
+                            {c.protocolo && <span style={{ marginLeft:8, fontSize:11, color:'#6b7280', fontFamily:'monospace' }}>Prot: {c.protocolo}</span>}
+                          </div>
+                          <span style={{ fontSize:10, color:'#9ca3af', fontWeight:700 }}>
+                            {data.toLocaleDateString('pt-BR')} {data.toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' })}
+                          </span>
+                        </div>
+                        <div style={{ fontSize:12, color:'#374151', marginTop:4 }}>
+                          {osData?.tipoManutencao && <span style={{ background:'#fef3c7', padding:'1px 8px', borderRadius:4, fontSize:10, fontWeight:700, color:'#92400e', marginRight:6 }}>{osData.tipoManutencao}</span>}
+                          {osData?.maquinaNome && <span style={{ fontSize:11, color:'#6b7280' }}>🖥️ {osData.maquinaNome}</span>}
+                        </div>
+                        {osData?.tecnicoNome && <div style={{ fontSize:11, color:'#6b7280', marginTop:2 }}>👷 {osData.tecnicoNome}</div>}
+                        {osData?.prestadoraNome && <div style={{ fontSize:11, color:'#6b7280', marginTop:2 }}>🏢 {osData.prestadoraNome}</div>}
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:4 }}>
+                          <span style={{ fontSize:11, fontWeight:700, color: c.status === 'concluido' ? '#16a34a' : c.status === 'em_andamento' ? '#d97706' : '#6b7280' }}>
+                            {c.status === 'concluido' ? '✅ Concluído' : c.status === 'em_andamento' ? '🔄 Em andamento' : c.status === 'cancelado' ? '❌ Cancelado' : '⏳ Aberto'}
+                          </span>
+                          {osData?.valorServico && <span style={{ fontSize:11, fontWeight:900, color:'#15803d' }}>R$ {Number(osData.valorServico).toFixed(2)}</span>}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+              <div style={{ padding:'10px 16px', borderTop:'1px solid #e5e7eb', textAlign:'center', fontSize:11, color:'#9ca3af', fontWeight:700 }}>
+                {filtrados.length} de {osList.length} O.S encontradas
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ── MODAL RELATÓRIO ── */}
+      {showRelatorio && (() => {
+        const CHAMADOS_KEY = 'manutencao_chamados_v2';
+        let todos: ChamadoManutencao[] = [];
+        try { todos = JSON.parse(localStorage.getItem(CHAMADOS_KEY) || '[]'); } catch { /* ok */ }
+        const osList = todos.filter(c => c.funcaoId?.startsWith('os_') || c.osTitulo || c.osNumero);
+
+        const de = relDataDe ? new Date(relDataDe + 'T00:00:00').getTime() : 0;
+        const ate = relDataAte ? new Date(relDataAte + 'T23:59:59').getTime() : Infinity;
+        const filtrados = osList.filter(c => c.criadoEm >= de && c.criadoEm <= ate);
+
+        const totalValor = filtrados.reduce((s, c) => {
+          const resps = c.respostas || {};
+          const osData = Object.values(resps).find((r: any) => r && typeof r === 'object' && r._tipo) as any;
+          const v = Number(osData?.valorServico);
+          return s + (isNaN(v) ? 0 : v);
+        }, 0);
+
+        const porStatus = { aberto: 0, em_andamento: 0, concluido: 0, cancelado: 0 };
+        filtrados.forEach(c => { if (porStatus[c.status] !== undefined) porStatus[c.status]++; });
+
+        const tiposCount: Record<string, number> = {};
+        filtrados.forEach(c => {
+          const resps = c.respostas || {};
+          const osData = Object.values(resps).find((r: any) => r && typeof r === 'object' && r._tipo) as any;
+          const tipo = osData?.tipoManutencao || 'Não definido';
+          tiposCount[tipo] = (tiposCount[tipo] || 0) + 1;
+        });
+
+        const imprimirRelatorio = () => {
+          const w = window.open('', '_blank');
+          if (!w) { alert('Popup bloqueado. Habilite popups para imprimir o relatório.'); return; }
+          w.document.write(`<html><head><title>Relatório de O.S</title><style>
+            body{font-family:Arial,sans-serif;padding:20px;color:#333}
+            h1{font-size:20px;text-align:center;margin-bottom:4px}
+            h2{font-size:14px;color:#666;text-align:center;margin-top:0}
+            .periodo{text-align:center;font-size:12px;color:#888;margin-bottom:20px}
+            .cards{display:flex;gap:10px;justify-content:center;margin-bottom:20px;flex-wrap:wrap}
+            .card{background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:12px 20px;text-align:center;min-width:120px}
+            .card .num{font-size:24px;font-weight:900}
+            .card .lbl{font-size:10px;color:#888;text-transform:uppercase;font-weight:700}
+            table{width:100%;border-collapse:collapse;font-size:12px;margin-top:10px}
+            th{background:#4f46e5;color:#fff;padding:8px;text-align:left}
+            td{padding:6px 8px;border-bottom:1px solid #e5e7eb}
+            tr:nth-child(even){background:#f8fafc}
+            .footer{text-align:center;font-size:10px;color:#999;margin-top:20px}
+          </style></head><body>
+          <h1>📊 Relatório de Ordens de Serviço</h1>
+          <h2>${funcao.nome}</h2>
+          <div class="periodo">${relDataDe ? new Date(relDataDe+'T12:00:00').toLocaleDateString('pt-BR') : 'Início'} a ${relDataAte ? new Date(relDataAte+'T12:00:00').toLocaleDateString('pt-BR') : 'Hoje'}</div>
+          <div class="cards">
+            <div class="card"><div class="num">${filtrados.length}</div><div class="lbl">Total O.S</div></div>
+            <div class="card"><div class="num" style="color:#16a34a">${porStatus.concluido}</div><div class="lbl">Concluídas</div></div>
+            <div class="card"><div class="num" style="color:#d97706">${porStatus.em_andamento}</div><div class="lbl">Em Andamento</div></div>
+            <div class="card"><div class="num" style="color:#6b7280">${porStatus.aberto}</div><div class="lbl">Abertas</div></div>
+            <div class="card"><div class="num" style="color:#15803d">R$ ${totalValor.toFixed(2)}</div><div class="lbl">Valor Total</div></div>
+          </div>
+          ${Object.keys(tiposCount).length > 0 ? `<h3 style="font-size:13px;margin-bottom:6px">Por Tipo de Manutenção</h3><div class="cards">${Object.entries(tiposCount).map(([t, n]) => `<div class="card"><div class="num">${n}</div><div class="lbl">${t}</div></div>`).join('')}</div>` : ''}
+          <table>
+            <thead><tr><th>Nº</th><th>Data</th><th>Tipo</th><th>Técnico</th><th>Máquina</th><th>Status</th><th>Valor</th></tr></thead>
+            <tbody>${filtrados.map(c => {
+              const resps = c.respostas || {};
+              const od = Object.values(resps).find((r: any) => r && typeof r === 'object' && r._tipo) as any;
+              const d = new Date(c.criadoEm);
+              return `<tr>
+                <td>${c.osNumero || c.numero}</td>
+                <td>${d.toLocaleDateString('pt-BR')}</td>
+                <td>${od?.tipoManutencao || '—'}</td>
+                <td>${od?.tecnicoNome || '—'}</td>
+                <td>${od?.maquinaNome || '—'}</td>
+                <td>${c.status === 'concluido' ? '✅' : c.status === 'em_andamento' ? '🔄' : c.status === 'cancelado' ? '❌' : '⏳'} ${c.status}</td>
+                <td>${od?.valorServico ? 'R$ ' + Number(od.valorServico).toFixed(2) : '—'}</td>
+              </tr>`;
+            }).join('')}</tbody>
+          </table>
+          <div class="footer">Gerado em ${new Date().toLocaleString('pt-BR')} • Simples Manutenção</div>
+          </body></html>`);
+          w.document.close();
+          w.onload = () => w.print();
+          setTimeout(() => { try { w.print(); } catch { /* onload já tratou */ } }, 500);
+        };
+
+        return (
+          <div style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}>
+            <div style={{ background:'#fff', borderRadius:16, width:'100%', maxWidth:500, maxHeight:'90vh', display:'flex', flexDirection:'column', overflow:'hidden' }}>
+              <div style={{ background:'linear-gradient(135deg,#059669,#047857)', color:'#fff', padding:'14px 16px', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <div style={{ fontSize:15, fontWeight:900 }}>📊 Relatório de O.S</div>
+                <button onClick={() => setShowRelatorio(false)} style={{ background:'rgba(255,255,255,0.2)', border:'none', borderRadius:8, color:'#fff', fontSize:18, cursor:'pointer', padding:'4px 10px', fontWeight:900 }}>✕</button>
+              </div>
+              <div style={{ padding:16, display:'flex', flexDirection:'column', gap:12 }}>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  <div>
+                    <label style={{ fontSize:10, fontWeight:700, color:'#6b7280', display:'block', marginBottom:3 }}>Data Início</label>
+                    <input type="date" value={relDataDe} onChange={e => setRelDataDe(e.target.value)} style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1.5px solid #d1d5db', fontSize:13, fontFamily:'inherit' }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize:10, fontWeight:700, color:'#6b7280', display:'block', marginBottom:3 }}>Data Fim</label>
+                    <input type="date" value={relDataAte} onChange={e => setRelDataAte(e.target.value)} style={{ width:'100%', padding:'8px 10px', borderRadius:8, border:'1.5px solid #d1d5db', fontSize:13, fontFamily:'inherit' }} />
+                  </div>
+                </div>
+
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:8, textAlign:'center' }}>
+                  <div style={{ background:'#f0f4ff', borderRadius:8, padding:10 }}>
+                    <div style={{ fontSize:22, fontWeight:900, color:'#4f46e5' }}>{filtrados.length}</div>
+                    <div style={{ fontSize:9, fontWeight:700, color:'#6b7280', textTransform:'uppercase' }}>Total O.S</div>
+                  </div>
+                  <div style={{ background:'#f0fdf4', borderRadius:8, padding:10 }}>
+                    <div style={{ fontSize:22, fontWeight:900, color:'#16a34a' }}>{porStatus.concluido}</div>
+                    <div style={{ fontSize:9, fontWeight:700, color:'#6b7280', textTransform:'uppercase' }}>Concluídas</div>
+                  </div>
+                  <div style={{ background:'#fef3c7', borderRadius:8, padding:10 }}>
+                    <div style={{ fontSize:22, fontWeight:900, color:'#d97706' }}>{porStatus.em_andamento}</div>
+                    <div style={{ fontSize:9, fontWeight:700, color:'#6b7280', textTransform:'uppercase' }}>Em Andamento</div>
+                  </div>
+                </div>
+
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  <div style={{ background:'#faf5ff', borderRadius:8, padding:10, textAlign:'center' }}>
+                    <div style={{ fontSize:22, fontWeight:900, color:'#7c3aed' }}>{porStatus.aberto}</div>
+                    <div style={{ fontSize:9, fontWeight:700, color:'#6b7280', textTransform:'uppercase' }}>Abertas</div>
+                  </div>
+                  <div style={{ background:'#f0fdf4', borderRadius:8, padding:10, textAlign:'center' }}>
+                    <div style={{ fontSize:16, fontWeight:900, color:'#15803d' }}>R$ {totalValor.toFixed(2)}</div>
+                    <div style={{ fontSize:9, fontWeight:700, color:'#6b7280', textTransform:'uppercase' }}>Valor Total</div>
+                  </div>
+                </div>
+
+                {Object.keys(tiposCount).length > 0 && (
+                  <div style={{ background:'#f8fafc', borderRadius:8, padding:10, border:'1px solid #e5e7eb' }}>
+                    <div style={{ fontSize:10, fontWeight:900, color:'#374151', textTransform:'uppercase', marginBottom:6 }}>Por Tipo de Manutenção</div>
+                    {Object.entries(tiposCount).map(([tipo, qtd]) => (
+                      <div key={tipo} style={{ display:'flex', justifyContent:'space-between', fontSize:12, padding:'3px 0', borderBottom:'1px solid #f1f5f9' }}>
+                        <span style={{ color:'#374151' }}>{tipo}</span>
+                        <span style={{ fontWeight:900, color:'#4f46e5' }}>{qtd}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <button type="button" onClick={imprimirRelatorio}
+                  style={{ padding:'12px', background:'linear-gradient(135deg,#059669,#047857)', border:'none', borderRadius:10, color:'#fff', fontWeight:900, fontSize:14, cursor:'pointer', fontFamily:'inherit' }}>
+                  🖨️ Imprimir Relatório
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
     </div>
   );
 };

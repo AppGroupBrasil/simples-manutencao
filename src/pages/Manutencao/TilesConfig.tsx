@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { Settings, X, RotateCcw, Plus, ChevronRight } from 'lucide-react';
+import { Settings, X, RotateCcw, Plus, ChevronRight, Eye, EyeOff } from 'lucide-react';
+import { PinConfig } from '../../components/PinProtecao';
 import css from './TilesConfig.module.css';
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -32,6 +33,26 @@ interface TileFixo {
    CONSTANTES
 ══════════════════════════════════════════════════════════════════════════ */
 const STORAGE_KEY = 'sm_tiles_prefs';
+const VISIBILITY_KEY = 'sm_tiles_ocultos_master';
+
+/* IDs dos tiles fixos que o master pode ocultar */
+const TILE_VISIBILITY_OPTIONS = [
+  { id: 'personalizar', label: '➕ Personalizar Manutenção' },
+  { id: 'livre',        label: '📋 Manutenção Livre' },
+  { id: 'checklist',    label: '📝 Checklist' },
+  { id: 'os',           label: '📋 Ordem de Serviço' },
+  { id: 'funcionarios', label: '👥 Funcionários' },
+  { id: 'maquinas',     label: '⚙️ Cadastro de Máquinas' },
+  { id: 'custom',       label: '🎨 Manutenções Personalizadas' },
+];
+
+export function carregarTilesOcultos(): string[] {
+  try { return JSON.parse(localStorage.getItem(VISIBILITY_KEY) || '[]'); } catch { return []; }
+}
+
+export function salvarTilesOcultos(ids: string[]) {
+  localStorage.setItem(VISIBILITY_KEY, JSON.stringify(ids));
+}
 
 const LAYOUTS: { id: LayoutTipo; nome: string }[] = [
   { id: 'simples', nome: 'Simples' },
@@ -235,12 +256,15 @@ export function TilesConfigModal({
   prefs,
   onUpdate,
   onClose,
+  isMaster,
 }: Readonly<{
   prefs: TilesPrefs;
   onUpdate: (p: Partial<TilesPrefs>) => void;
   onClose: () => void;
+  isMaster?: boolean;
 }>) {
   const [local, setLocal] = useState<TilesPrefs>({ ...prefs, cores: prefs.cores.map(c => ({ ...c })) });
+  const [ocultos, setOcultos] = useState<string[]>(carregarTilesOcultos);
 
   const setLayout = (l: LayoutTipo) => {
     setLocal(prev => ({ ...prev, layout: l }));
@@ -266,7 +290,12 @@ export function TilesConfigModal({
 
   const salvar = () => {
     onUpdate(local);
+    if (isMaster) salvarTilesOcultos(ocultos); // isMaster aqui = master ou admin
     onClose();
+  };
+
+  const toggleOculto = (id: string) => {
+    setOcultos(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
   const resetar = () => {
@@ -387,6 +416,52 @@ export function TilesConfigModal({
               ))}
             </div>
           </div>
+
+          {/* Visibilidade dos tiles (só master) */}
+          {isMaster && (
+            <div className={css.cfgSecao}>
+              <span className={css.cfgSecaoTitulo}>👁️ Visibilidade para Usuários</span>
+              <p style={{ fontSize: 11, color: '#9ca3af', margin: '0 0 10px', lineHeight: 1.5 }}>
+                Oculte seções que os usuários não precisam ver. Tiles ocultos ficam invisíveis para todos exceto o Master.
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {TILE_VISIBILITY_OPTIONS.map(opt => {
+                  const visivel = !ocultos.includes(opt.id);
+                  return (
+                    <button key={opt.id} type="button" onClick={() => toggleOculto(opt.id)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px',
+                        border: `1.5px solid ${visivel ? '#bbf7d0' : '#fecaca'}`,
+                        borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit',
+                        background: visivel ? '#f0fdf4' : '#fef2f2',
+                        transition: 'all 0.2s',
+                      }}>
+                      {visivel
+                        ? <Eye size={16} style={{ color: '#16a34a', flexShrink: 0 }} />
+                        : <EyeOff size={16} style={{ color: '#dc2626', flexShrink: 0 }} />}
+                      <span style={{ fontSize: 13, fontWeight: 700, color: visivel ? '#15803d' : '#991b1b', flex: 1, textAlign: 'left' }}>
+                        {opt.label}
+                      </span>
+                      <span style={{ fontSize: 10, fontWeight: 800, color: visivel ? '#16a34a' : '#dc2626', background: visivel ? '#dcfce7' : '#fee2e2', padding: '2px 8px', borderRadius: 6 }}>
+                        {visivel ? 'VISÍVEL' : 'OCULTO'}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* PIN de Proteção */}
+          {isMaster && (
+            <div className={css.cfgSecao}>
+              <span className={css.cfgSecaoTitulo}>🔒 PIN de Proteção</span>
+              <p style={{ fontSize: 11, color: '#9ca3af', margin: '0 0 10px', lineHeight: 1.5 }}>
+                Defina um PIN de 4 dígitos para proteger ações de edição e exclusão.
+              </p>
+              <PinConfig />
+            </div>
+          )}
 
           {/* Ações */}
           <div style={{ display: 'flex', gap: 10 }}>

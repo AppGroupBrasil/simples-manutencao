@@ -4,7 +4,7 @@ export interface BlocoDisponivel {
   nome: string;
   icone: string;
   descricao: string;
-  categoria: 'basico' | 'avaliacao' | 'comunicacao' | 'operacional' | 'tempo' | 'veiculo' | 'documentos';
+  categoria: 'basico' | 'avaliacao' | 'comunicacao' | 'operacional' | 'tempo' | 'veiculo' | 'documentos' | 'ordem_servico';
   temDropdown?: boolean;
 }
 

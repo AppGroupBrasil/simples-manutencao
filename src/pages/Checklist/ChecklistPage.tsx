@@ -11,6 +11,7 @@ import {
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from 'recharts';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePin, PinModal } from '../../components/PinProtecao';
 import ReportarProblema from './ReportarProblema';
 import type { Checklist, ItemChecklist, ProblemaItem } from './types';
 import styles from './Checklist.module.css';
@@ -209,6 +210,7 @@ const ChecklistPage: React.FC = () => {
   const userId = usuario?.id   || '';
   const nome   = usuario?.nome || '';
   const podeGerenciar = role === 'master' || role === 'administrador' || role === 'supervisor';
+  const { aberto: pinAberto, pedirPin, onSucesso: pinSucesso, onFechar: pinFechar } = usePin();
 
   const [checklists, setChecklists] = useState<Checklist[]>(carregar);
   const [abaAtiva, setAbaAtiva]     = useState<Aba>('meus');
@@ -890,7 +892,7 @@ const ChecklistPage: React.FC = () => {
               )}
               {podeGerenciar && (
                 <button
-                  onClick={() => { setEditandoChecklist(cl); setEditTitulo(cl.titulo); setEditResp(cl.responsavelNome || ''); }}
+                  onClick={() => pedirPin(() => { setEditandoChecklist(cl); setEditTitulo(cl.titulo); setEditResp(cl.responsavelNome || ''); })}
                   style={{ display:'flex', alignItems:'center', justifyContent:'center', padding:'8px', background:'rgba(59,130,246,0.1)', border:'1.5px solid rgba(59,130,246,0.3)', color:'#2563eb', borderRadius:10, cursor:'pointer', width:36, height:36 }}
                   title="Editar"
                 >
@@ -926,7 +928,7 @@ const ChecklistPage: React.FC = () => {
                 <Eye size={16} />
               </button>
               {podeGerenciar && (
-                <button className={styles.btnExcluirCl} onClick={() => excluirChecklist(cl.id)} title="Excluir" style={{ width:36, height:36, padding:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
+                <button className={styles.btnExcluirCl} onClick={() => pedirPin(() => excluirChecklist(cl.id))} title="Excluir" style={{ width:36, height:36, padding:0, display:'flex', alignItems:'center', justifyContent:'center' }}>
                   <Trash2 size={16} />
                 </button>
               )}
@@ -1516,6 +1518,9 @@ const ChecklistPage: React.FC = () => {
           onCancelar={() => setReportandoItem(null)}
         />
       )}
+
+      <PinModal aberto={pinAberto} onSucesso={pinSucesso} onFechar={pinFechar} />
+
     </div>
   );
 };

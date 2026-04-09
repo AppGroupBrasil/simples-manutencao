@@ -5,6 +5,7 @@ import {
   Users, CheckCircle, XCircle, Building2, Wifi, RefreshCw,
 } from 'lucide-react';
 import { useAuth, Usuario } from '../../contexts/AuthContext';
+import { usePin, PinModal } from '../../components/PinProtecao';
 import styles from './Dashboard.module.css';
 
 const TRIAL_API = 'https://api.simplesmanutencao.com.br';
@@ -53,6 +54,7 @@ function formatarDataHora(ts: number) {
 export default function DashboardPage() {
   const { usuario, listarAdmins, bloquearAdmin, desbloquearAdmin, excluirAdmin, editarAdmin } = useAuth();
   const navigate = useNavigate();
+  const { aberto: pinAberto, pedirPin, onSucesso: pinSucesso, onFechar: pinFechar } = usePin();
 
   // ── aba ────────────────────────────────────────────────
   const [aba, setAba] = useState<Aba>('clientes');
@@ -299,7 +301,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                   <div className={styles.acoes}>
-                    <button className={`${styles.btnAcao} ${styles.btnEditar}`} onClick={() => abrirEditar(c)}>
+                    <button className={`${styles.btnAcao} ${styles.btnEditar}`} onClick={() => pedirPin(() => abrirEditar(c))}>
                       <Pencil size={13} /> Editar
                     </button>
                     <button
@@ -308,7 +310,7 @@ export default function DashboardPage() {
                     >
                       {c.bloqueado ? <><ShieldOff size={13} /> Desbloquear</> : <><Shield size={13} /> Bloquear</>}
                     </button>
-                    <button className={`${styles.btnAcao} ${styles.btnExcluir}`} onClick={() => setModal({ tipo: 'excluir', cliente: c })}>
+                    <button className={`${styles.btnAcao} ${styles.btnExcluir}`} onClick={() => pedirPin(() => setModal({ tipo: 'excluir', cliente: c }))}>
                       <Trash2 size={13} /> Excluir
                     </button>
                   </div>
@@ -447,6 +449,8 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      <PinModal aberto={pinAberto} onSucesso={pinSucesso} onFechar={pinFechar} />
 
     </div>
   );

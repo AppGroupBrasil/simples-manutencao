@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import { apiLogin, apiRegister, apiCreateUser, apiDeleteUser, clearToken, getToken, syncUpload, syncDownload, startAutoSync, stopAutoSync } from '../utils/api';
 
 export type Role = 'master' | 'administrador' | 'supervisor' | 'funcionario';
 
@@ -76,12 +77,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     try {
       const s = localStorage.getItem(SESSION_KEY);
-      if (s) setUsuario(JSON.parse(s));
+      if (s) {
+        setUsuario(JSON.parse(s));
+        // If we have a token, start auto-sync and download latest data
+        if (getToken()) {
+          startAutoSync();
+          syncDownload().catch(() => {});
+        }
+      }
     } catch {}
     setCarregando(false);
   }, []);
 
   const login = async (loginStr: string, senha: string) => {
+    // Try server first
+    try {
+      const data = await apiLogin(loginStr, senha);
+      if (data.usuario) {
+        setUsuario(data.usuario);
+        localStorage.setItem(SESSION_KEY, JSON.stringify(data.usuario));
+        // Sync: download server data to local
+        startAutoSync();
+        syncDownload().catch(() => {});
+        return;
+      }
+    } catch (apiErr: any) {
+      // If server explicitly rejects, throw that error
+      if (apiErr.message && !apiErr.message.includes('fetch') && !apiErr.message.includes('network') && !apiErr.message.includes('Failed')) {
+        throw apiErr;
+      }
+      // Otherwise fall through to localStorage
+    }
+
+    // Fallback: local
     const usuarios = getUsuarios();
     const found = usuarios.find(u =>
       (u.login === loginStr || u.email === loginStr) && u.senha === senha
@@ -94,11 +122,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = () => {
+    // Upload latest data before logout
+    syncUpload().catch(() => {});
+    stopAutoSync();
+    clearToken();
     setUsuario(null);
     localStorage.removeItem(SESSION_KEY);
   };
 
   const registrar = async (dados: { nome: string; email: string; senha: string }) => {
+    // Try server first
+    try {
+      const data = await apiRegister(dados.nome, dados.email, dados.senha);
+      if (data.usuario) {
+        setUsuario(data.usuario);
+        localStorage.setItem(SESSION_KEY, JSON.stringify(data.usuario));
+        startAutoSync();
+        // Also save locally
+        const usuarios = getUsuarios();
+        const emailNorm = dados.email.trim().toLowerCase();
+        if (!usuarios.some(u => u.login === emailNorm || u.email === emailNorm)) {
+          const novoLocal: UsuarioComSenha = {
+            ...data.usuario, senha: dados.senha,
+          };
+          salvarUsuarios([...usuarios, novoLocal]);
+        }
+        return;
+      }
+    } catch (apiErr: any) {
+      if (apiErr.message && !apiErr.message.includes('fetch') && !apiErr.message.includes('network') && !apiErr.message.includes('Failed')) {
+        throw apiErr;
+      }
+    }
+
+    // Fallback: local only
     const usuarios = getUsuarios();
     const emailNorm = dados.email.trim().toLowerCase();
     if (usuarios.some(u => u.login === emailNorm || u.email === emailNorm)) throw new Error('Já existe uma conta com esse e-mail.');
@@ -134,12 +191,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       administradorId: dados.adminId || usuario?.administradorId,
     };
     salvarUsuarios([...usuarios, novoUsuario]);
+
+    // Also create on server
+    apiCreateUser({ nome: dados.nome, cargo: dados.cargo, senha: dados.senha, role: 'funcionario' }).catch(() => {});
+
     return { login: loginGerado };
   };
 
   const excluirFuncionario = (id: string) => {
     const usuarios = getUsuarios().filter(u => u.id !== id);
     salvarUsuarios(usuarios);
+    apiDeleteUser(id).catch(() => {});
   };
 
   const listarAdmins = (): Usuario[] => {
@@ -161,6 +223,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const excluirAdmin = (id: string) => {
     const usuarios = getUsuarios().filter(u => u.id !== id && u.adminId !== id);
     salvarUsuarios(usuarios);
+    apiDeleteUser(id).catch(() => {});
   };
 
   const editarAdmin = (id: string, dados: Partial<Pick<Usuario, 'nome' | 'email' | 'plano'>>) => {

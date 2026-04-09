@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { UserPlus, Trash2, Copy, Check } from 'lucide-react';
 import { useAuth, gerarLogin } from '../../contexts/AuthContext';
+import { usePin, PinModal } from '../../components/PinProtecao';
 import styles from './Usuarios.module.css';
 
 const CARGOS = ['Mecânico', 'Operador', 'Eletricista', 'Encanador', 'Pintor', 'Porteiro', 'Zelador', 'Técnico', 'Auxiliar', 'Outro'];
 
 const UsuariosPage: React.FC = () => {
   const { listarFuncionarios, criarFuncionario, excluirFuncionario, usuario } = useAuth();
+  const { aberto: pinAberto, pedirPin, onSucesso: pinSucesso, onFechar: pinFechar } = usePin();
 
   const [mostrarForm, setMostrarForm] = useState(false);
   const [nome, setNome]   = useState('');
@@ -157,7 +159,7 @@ const UsuariosPage: React.FC = () => {
               </div>
               <button
                 className={styles.btnExcluir}
-                onClick={() => handleExcluir(f.id, f.nome)}
+                onClick={() => pedirPin(() => handleExcluir(f.id, f.nome))}
                 title="Excluir funcionário"
               >
                 <Trash2 size={16} />
@@ -166,6 +168,9 @@ const UsuariosPage: React.FC = () => {
           ))
         )}
       </div>
+
+      <PinModal aberto={pinAberto} onSucesso={pinSucesso} onFechar={pinFechar} />
+
     </div>
   );
 };

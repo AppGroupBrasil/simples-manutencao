@@ -10,7 +10,8 @@ import { QRCodeCanvas } from 'qrcode.react';
 import type { FuncaoManutencao, ChamadoManutencao, OrcamentoData, ContratoData, ReciboData } from './types';
 import { BLOCOS_DISPONIVEIS } from './constants';
 import styles from './Manutencao.module.css';
-import { useTilesPrefs, GearButton, TilesConfigModal, TilesRenderer } from './TilesConfig';
+import { useTilesPrefs, GearButton, TilesConfigModal, TilesRenderer, carregarTilesOcultos } from './TilesConfig';
+import { usePin, PinModal } from '../../components/PinProtecao';
 import type { TileAction } from './TilesConfig';
 
 function gerarQrDataUrl(chamadoId: string): string {
@@ -18,6 +19,297 @@ function gerarQrDataUrl(chamadoId: string): string {
   const canvas = wrapper?.querySelector('canvas');
   if (canvas) return canvas.toDataURL('image/png');
   return '';
+}
+
+// ── Modal Cadastro de Máquinas ──────────────────────────────
+const LS_CAD_MAQUINAS = 'sm_cad_maquinas';
+const LS_CONT_MAQUINAS = 'sm_contador_maquinas';
+type CadMaq = { nome: string; codigo: string; numero: string; setor?: string; modelo?: string; marca?: string; localizacao?: string };
+
+function proximoNumeroMaq(): string {
+  const atual = Number(localStorage.getItem(LS_CONT_MAQUINAS) || '0');
+  const prox = atual + 1;
+  localStorage.setItem(LS_CONT_MAQUINAS, String(prox));
+  return String(prox).padStart(5, '0');
+}
+
+function CadastroMaquinasModal({ onClose }: { onClose: () => void }) {
+  const getMaquinas = (): CadMaq[] => { try { return JSON.parse(localStorage.getItem(LS_CAD_MAQUINAS) || '[]'); } catch { return []; } };
+  const [maquinas, setMaquinas] = useState<CadMaq[]>(getMaquinas);
+  const [nome, setNome] = useState('');
+  const [codigo, setCodigo] = useState('');
+  const [modelo, setModelo] = useState('');
+  const [marca, setMarca] = useState('');
+  const [localizacao, setLocalizacao] = useState('');
+  const [setor, setSetor] = useState('');
+
+  // ── Aba: cadastro | historico
+  const [aba, setAba] = useState<'cadastro' | 'historico'>('cadastro');
+
+  // ── Filtros do histórico
+  const [hBusca, setHBusca] = useState('');
+  const [hSetor, setHSetor] = useState('');
+  const [hDe, setHDe] = useState('');
+  const [hAte, setHAte] = useState('');
+
+  const salvarMaq = (lista: CadMaq[]) => {
+    localStorage.setItem(LS_CAD_MAQUINAS, JSON.stringify(lista));
+    setMaquinas(lista);
+  };
+
+  const adicionar = () => {
+    if (!nome.trim()) { alert('Informe o nome da máquina.'); return; }
+    if (maquinas.some(m => m.nome.toLowerCase() === nome.trim().toLowerCase())) { alert(`Máquina "${nome.trim()}" já existe!`); return; }
+    const num = proximoNumeroMaq();
+    const nova: CadMaq = { nome: nome.trim(), codigo: codigo.trim(), numero: num, setor: setor.trim() || undefined, modelo: modelo.trim() || undefined, marca: marca.trim() || undefined, localizacao: localizacao.trim() || undefined };
+    salvarMaq([...maquinas, nova]);
+    setNome(''); setCodigo(''); setModelo(''); setMarca(''); setLocalizacao(''); setSetor('');
+    alert(`✅ Máquina "${nova.nome}" cadastrada! Nº ${num}`);
+  };
+
+  const excluir = (i: number) => {
+    if (!confirm(`Excluir "${maquinas[i].nome}" (Nº ${maquinas[i].numero}) da lista?`)) return;
+    salvarMaq(maquinas.filter((_, idx) => idx !== i));
+  };
+
+  // ── Histórico: ler chamados e cruzar com máquinas ──
+  const historico = useMemo(() => {
+    let chamados: any[] = [];
+    try { chamados = JSON.parse(localStorage.getItem('manutencao_chamados_v2') || '[]'); } catch { /* ok */ }
+    const resultados: { chamado: any; osData: any; maquina: CadMaq | null }[] = [];
+    for (const c of chamados) {
+      const od = Object.values(c.respostas || {}).find((r: any) => r && typeof r === 'object' && r._tipo) as any;
+      if (!od) continue;
+      const maqNome = (od.maquinaNome || '').toLowerCase();
+      const maqCod = (od.maquinaCodigo || '').toLowerCase();
+      const maqNum = od.maquinaNumero || '';
+      // Encontrar máquina correspondente
+      const maq = maquinas.find(m =>
+        (maqNum && m.numero === maqNum) ||
+        (maqNome && m.nome.toLowerCase() === maqNome) ||
+        (maqCod && m.codigo.toLowerCase() === maqCod)
+      ) || null;
+      if (maq || maqNome) {
+        resultados.push({ chamado: c, osData: od, maquina: maq });
+      }
+    }
+    return resultados;
+  }, [maquinas]);
+
+  const historicoFiltrado = useMemo(() => {
+    let lista = historico;
+    if (hBusca.trim()) {
+      const q = hBusca.trim().toLowerCase();
+      lista = lista.filter(h => {
+        const mNome = (h.osData.maquinaNome || '').toLowerCase();
+        const mNum = h.maquina?.numero || h.osData.maquinaNumero || '';
+        const mCod = (h.osData.maquinaCodigo || '').toLowerCase();
+        const cNum = String(h.chamado.numero || '');
+        return mNome.includes(q) || mNum.includes(q) || mCod.includes(q) || cNum.includes(q);
+      });
+    }
+    if (hSetor) {
+      lista = lista.filter(h => {
+        const ms = h.maquina?.setor || h.osData.maquinaSetor || '';
+        return ms.toLowerCase() === hSetor.toLowerCase();
+      });
+    }
+    if (hDe) {
+      const deMs = new Date(hDe + 'T00:00:00').getTime();
+      lista = lista.filter(h => (h.chamado.criadoEm || 0) >= deMs);
+    }
+    if (hAte) {
+      const ateMs = new Date(hAte + 'T23:59:59').getTime();
+      lista = lista.filter(h => (h.chamado.criadoEm || 0) <= ateMs);
+    }
+    return lista.sort((a, b) => (b.chamado.criadoEm || 0) - (a.chamado.criadoEm || 0));
+  }, [historico, hBusca, hSetor, hDe, hAte]);
+
+  // ── Setores únicos
+  const setoresUnicos = useMemo(() => {
+    const s = new Set<string>();
+    maquinas.forEach(m => { if (m.setor) s.add(m.setor); });
+    return Array.from(s).sort();
+  }, [maquinas]);
+
+  const fieldLbl = (txt: string) => <label style={{ fontSize:10, fontWeight:700, color:'#6b7280', display:'block', marginBottom:3 }}>{txt}</label>;
+  const fieldInput = (val: string, set: (v: string) => void, ph: string) => (
+    <input value={val} onChange={e => set(e.target.value)} placeholder={ph}
+      style={{ width:'100%', padding:'10px 14px', border:'2px solid #e5e7eb', borderRadius:10, fontSize:13, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }} />
+  );
+
+  const statusLabel: Record<string, { cor: string; texto: string }> = {
+    aberto: { cor: '#f59e0b', texto: 'Não Iniciada' },
+    em_andamento: { cor: '#3b82f6', texto: 'Em Andamento' },
+    concluido: { cor: '#10b981', texto: 'Concluída' },
+    cancelado: { cor: '#ef4444', texto: 'Cancelada' },
+  };
+
+  return (
+    <div style={{ position:'fixed', inset:0, zIndex:9999, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
+      onClick={onClose} role="dialog">
+      <div style={{ background:'#fff', borderRadius:20, width:'100%', maxWidth:600, maxHeight:'88vh', overflow:'auto', boxShadow:'0 24px 80px rgba(0,0,0,0.3)' }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ background:'linear-gradient(135deg,#FFD600,#FF8F00)', padding:'20px 24px', borderRadius:'20px 20px 0 0', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div>
+            <h2 style={{ margin:0, fontSize:20, fontWeight:900, color:'#0D0D0D' }}>⚙️ Cadastro de Máquinas</h2>
+            <p style={{ margin:'4px 0 0', fontSize:12, color:'#0D0D0D', opacity:0.7 }}>Gerencie equipamentos e consulte históricos</p>
+          </div>
+          <button onClick={onClose} style={{ background:'rgba(0,0,0,0.15)', border:'none', borderRadius:'50%', width:32, height:32, fontSize:18, cursor:'pointer', color:'#0D0D0D', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display:'flex', borderBottom:'2px solid #e5e7eb' }}>
+          {([['cadastro', '📋 Cadastro'], ['historico', '🔍 Histórico']] as const).map(([key, label]) => (
+            <button key={key} onClick={() => setAba(key)}
+              style={{ flex:1, padding:'12px 0', fontSize:13, fontWeight:800, border:'none', cursor:'pointer', background: aba === key ? '#fffbeb' : '#fff', color: aba === key ? '#b45309' : '#9ca3af', borderBottom: aba === key ? '3px solid #f59e0b' : '3px solid transparent' }}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ padding:20 }}>
+          {aba === 'cadastro' && (
+            <>
+              {/* Form nova máquina */}
+              <div style={{ background:'#fffbeb', borderRadius:14, padding:16, border:'1.5px solid #fde68a' }}>
+                <div style={{ fontSize:12, fontWeight:800, color:'#92400e', textTransform:'uppercase', letterSpacing:0.5, marginBottom:12 }}>➕ Nova Máquina</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                  <div>{fieldLbl('Nome *')}{fieldInput(nome, setNome, 'Ex: Compressor, Elevador...')}</div>
+                  <div>{fieldLbl('Código / Patrimônio')}{fieldInput(codigo, setCodigo, 'Ex: EQ-0042')}</div>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:8 }}>
+                  <div>{fieldLbl('Setor')}{fieldInput(setor, setSetor, 'Ex: Produção, Manutenção...')}</div>
+                  <div>{fieldLbl('Localização')}{fieldInput(localizacao, setLocalizacao, 'Ex: Bloco A, 2º andar')}</div>
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:8 }}>
+                  <div>{fieldLbl('Modelo')}{fieldInput(modelo, setModelo, 'Ex: Split 12000 BTUs')}</div>
+                  <div>{fieldLbl('Marca')}{fieldInput(marca, setMarca, 'Ex: Samsung, Bosch')}</div>
+                </div>
+                <div style={{ background:'#eff6ff', borderRadius:8, padding:'8px 12px', marginTop:10, border:'1px solid #bfdbfe' }}>
+                  <span style={{ fontSize:11, color:'#1e40af' }}>🔢 O número de 5 dígitos será gerado automaticamente ao cadastrar.</span>
+                </div>
+                <button onClick={adicionar}
+                  style={{ marginTop:12, width:'100%', padding:'12px', background:'linear-gradient(135deg,#FFD600,#FF8F00)', border:'none', borderRadius:10, fontSize:14, fontWeight:900, color:'#0D0D0D', cursor:'pointer', boxShadow:'0 4px 16px rgba(255,183,0,0.35)' }}>
+                  💾 Cadastrar Máquina
+                </button>
+              </div>
+
+              {/* Lista de máquinas cadastradas */}
+              <div style={{ marginTop:20 }}>
+                <div style={{ fontSize:12, fontWeight:800, color:'#6b7280', textTransform:'uppercase', letterSpacing:0.5, marginBottom:10 }}>
+                  Máquinas Cadastradas ({maquinas.length})
+                </div>
+                {maquinas.length === 0 ? (
+                  <div style={{ textAlign:'center', padding:'24px 16px', color:'#9ca3af', fontSize:13 }}>
+                    Nenhuma máquina cadastrada ainda.
+                  </div>
+                ) : (
+                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                    {maquinas.map((m, i) => (
+                      <div key={i} style={{ background:'#f9fafb', border:'1.5px solid #e5e7eb', borderRadius:12, padding:'12px 14px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                        <div style={{ minWidth:0, flex:1 }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                            <span style={{ background:'#fef3c7', color:'#92400e', fontSize:11, fontWeight:900, padding:'2px 8px', borderRadius:6, fontFamily:'monospace' }}>Nº {m.numero}</span>
+                            <span style={{ fontSize:14, fontWeight:800, color:'#0D0D0D' }}>🖥️ {m.nome}</span>
+                          </div>
+                          <div style={{ fontSize:11, color:'#6b7280', marginTop:3, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                            {[m.codigo && `Cód: ${m.codigo}`, m.setor && `🏢 ${m.setor}`, m.modelo && `Mod: ${m.modelo}`, m.marca && m.marca, m.localizacao && `📍 ${m.localizacao}`].filter(Boolean).join(' • ') || 'Sem detalhes'}
+                          </div>
+                        </div>
+                        <button onClick={() => excluir(i)}
+                          style={{ background:'#fee2e2', border:'1.5px solid #fca5a5', borderRadius:8, width:32, height:32, color:'#dc2626', fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginLeft:8 }}>
+                          🗑️
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {aba === 'historico' && (
+            <>
+              {/* Busca por número */}
+              <div style={{ position:'relative', marginBottom:12 }}>
+                <input value={hBusca} onChange={e => setHBusca(e.target.value)}
+                  placeholder="🔍 Buscar por Nº máquina, nome ou código..."
+                  style={{ width:'100%', padding:'12px 40px 12px 14px', border:'2px solid #fde68a', borderRadius:12, fontSize:14, fontWeight:700, fontFamily:'inherit', outline:'none', boxSizing:'border-box', background:'#fffbeb' }} />
+                {hBusca && (
+                  <button onClick={() => setHBusca('')} style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', fontSize:16, color:'#9ca3af' }}>✕</button>
+                )}
+              </div>
+
+              {/* Filtros */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:16 }}>
+                <div>
+                  {fieldLbl('Setor')}
+                  <select value={hSetor} onChange={e => setHSetor(e.target.value)}
+                    style={{ width:'100%', padding:'8px 10px', border:'2px solid #e5e7eb', borderRadius:8, fontSize:12, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }}>
+                    <option value="">Todos</option>
+                    {setoresUnicos.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  {fieldLbl('Data De')}
+                  <input type="date" value={hDe} onChange={e => setHDe(e.target.value)}
+                    style={{ width:'100%', padding:'8px 10px', border:'2px solid #e5e7eb', borderRadius:8, fontSize:12, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }} />
+                </div>
+                <div>
+                  {fieldLbl('Data Até')}
+                  <input type="date" value={hAte} onChange={e => setHAte(e.target.value)}
+                    style={{ width:'100%', padding:'8px 10px', border:'2px solid #e5e7eb', borderRadius:8, fontSize:12, fontFamily:'inherit', outline:'none', boxSizing:'border-box' }} />
+                </div>
+              </div>
+
+              {/* Resultados */}
+              <div style={{ fontSize:12, fontWeight:800, color:'#6b7280', textTransform:'uppercase', letterSpacing:0.5, marginBottom:10 }}>
+                Resultados ({historicoFiltrado.length})
+              </div>
+              {historicoFiltrado.length === 0 ? (
+                <div style={{ textAlign:'center', padding:'32px 16px', color:'#9ca3af', fontSize:13 }}>
+                  {hBusca || hSetor || hDe || hAte ? 'Nenhum resultado para os filtros selecionados.' : 'Nenhum histórico de manutenção encontrado.'}
+                </div>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                  {historicoFiltrado.map((h, i) => {
+                    const st = statusLabel[h.chamado.status] || statusLabel.aberto;
+                    const dt = h.chamado.criadoEm ? new Date(h.chamado.criadoEm) : null;
+                    return (
+                      <div key={i} style={{ background:'#f9fafb', border:'1.5px solid #e5e7eb', borderRadius:12, padding:'12px 14px' }}>
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
+                          <div style={{ display:'flex', alignItems:'center', gap:6, flexWrap:'wrap' }}>
+                            {h.maquina && <span style={{ background:'#fef3c7', color:'#92400e', fontSize:10, fontWeight:900, padding:'2px 6px', borderRadius:5, fontFamily:'monospace' }}>Nº {h.maquina.numero}</span>}
+                            <span style={{ fontSize:13, fontWeight:800, color:'#0D0D0D' }}>🖥️ {h.osData.maquinaNome || '—'}</span>
+                          </div>
+                          <span style={{ fontSize:10, fontWeight:800, color: st.cor, background: st.cor + '18', padding:'2px 8px', borderRadius:6 }}>{st.texto}</span>
+                        </div>
+                        <div style={{ display:'flex', flexWrap:'wrap', gap:6, fontSize:11, color:'#6b7280' }}>
+                          {dt && <span>📅 {dt.toLocaleDateString('pt-BR')}</span>}
+                          {h.chamado.numero && <span>🔢 Chamado #{h.chamado.numero}</span>}
+                          {h.osData.tipoManutencao && <span>🔧 {h.osData.tipoManutencao}</span>}
+                          {h.osData.tecnicoNome && <span>👷 {h.osData.tecnicoNome}</span>}
+                          {(h.maquina?.setor || h.osData.maquinaSetor) && <span>🏢 {h.maquina?.setor || h.osData.maquinaSetor}</span>}
+                        </div>
+                        {h.osData.tecnicoDescricao && (
+                          <div style={{ fontSize:11, color:'#4b5563', marginTop:4, background:'#fff', padding:'6px 10px', borderRadius:8, border:'1px solid #e5e7eb', lineHeight:1.4 }}>
+                            {h.osData.tecnicoDescricao.length > 120 ? h.osData.tecnicoDescricao.slice(0, 120) + '…' : h.osData.tecnicoDescricao}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const FUNCOES_KEY   = 'manutencao_funcoes_v2';
@@ -95,8 +387,8 @@ function compartilharChamado(c: ChamadoManutencao) {
     });
   }
 
-  const link = `${globalThis.location.origin}/manutencao/form?chamado=${c.id}`;
-  linhas.push('', `🔗 Preencher manutenção: ${link}`, `📱 QR Code: ${link}`, '_Enviado pelo Simples Manutenção_');
+  const link = `${globalThis.location.origin}/chamado/${c.protocolo}`;
+  linhas.push('', `🔗 Ver chamado: ${link}`, `📱 QR Code: ${link}`, '_Enviado pelo Simples Manutenção_');
   const texto = linhas.join('\n');
 
   if (navigator.share) {
@@ -284,7 +576,7 @@ function imprimirChamado(c: ChamadoManutencao) {
       s.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js';
       s.onload = function() {
         if (typeof QRCode !== 'undefined' && qrImg) {
-          QRCode.toDataURL('${c.protocolo}', { width: 320, margin: 2 }, function(err, dataUrl) {
+          QRCode.toDataURL('${globalThis.location.origin}/chamado/${c.protocolo}', { width: 320, margin: 2 }, function(err, dataUrl) {
             if (!err) qrImg.src = dataUrl;
             setTimeout(function() { window.print(); }, 500);
           });
@@ -1092,6 +1384,7 @@ const ManutencaoPage: React.FC = () => {
   const ehFuncionario = role === 'funcionario';
 
   const OS_ID = '__ordem_servico__';
+  const OS_AT_ID = '__os_assistencia_tecnica__';
 
   const [funcoes,  setFuncoes]  = useState<FuncaoManutencao[]>(() => carregar(FUNCOES_KEY, []));
   const [chamados, setChamados] = useState<ChamadoManutencao[]>(() => carregar(CHAMADOS_KEY, []));
@@ -1116,11 +1409,25 @@ const ManutencaoPage: React.FC = () => {
   const [, setQrAmpliado] = useState<ChamadoManutencao | null>(null);
   const [confirmandoExclusao, setConfirmandoExclusao] = useState<string | null>(null);
   const [osConfigAberto, setOsConfigAberto] = useState(false);
+  const [osModalAberto, setOsModalAberto] = useState(false);
+  const [cadMaquinasAberto, setCadMaquinasAberto] = useState(false);
   const [osOcultos, setOsOcultos] = useState<string[]>(() => carregar(OS_OCULTOS_KEY, []));
+
+  // PIN de proteção para editar/excluir
+  const { aberto: pinAberto, pedirPin, onSucesso: pinSucesso, onFechar: pinFechar } = usePin();
 
   // Config layout/cores dos tiles
   const { prefs: tilesPrefs, atualizar: atualizarTilesPrefs } = useTilesPrefs();
   const [cfgAberto, setCfgAberto] = useState(false);
+  const isMaster = role === 'master';
+  const podeConfigurarVisibilidade = role === 'master' || role === 'administrador';
+  const [tilesOcultos, setTilesOcultos] = useState<string[]>(carregarTilesOcultos);
+
+  // Verifica se um tile deve ser visível (master/admin vê tudo, outros respeitam config)
+  const tileVisivel = useCallback((tileId: string) => {
+    if (podeConfigurarVisibilidade) return true;
+    return !tilesOcultos.includes(tileId);
+  }, [podeConfigurarVisibilidade, tilesOcultos]);
 
   // Abre formulário automaticamente se vier via link compartilhado (?abrir=funcaoId)
   useEffect(() => {
@@ -1174,6 +1481,9 @@ const ManutencaoPage: React.FC = () => {
       const prox = atual + 1;
       localStorage.setItem(OS_CONTADOR_KEY, String(prox));
       chamado.osNumero = String(prox).padStart(6, '0');
+    }
+    if (chamado.funcaoId === OS_AT_ID) {
+      chamado.osTitulo = 'Assistência Técnica';
     }
     setChamados(prev => { const p = [chamado, ...prev]; salvar(CHAMADOS_KEY, p); return p; });
     setFormAberto(null);
@@ -1286,9 +1596,9 @@ const ManutencaoPage: React.FC = () => {
   }), [meusChamadosVisiveis, meusChamadosConcluidos]);
 
   const funcoesFiltradas = useMemo(() => {
-    if (!busca.trim()) return funcoes.filter(f => f.ativo && f.id !== OS_ID);
+    if (!busca.trim()) return funcoes.filter(f => f.ativo && f.id !== OS_ID && f.id !== OS_AT_ID);
     const q = busca.toLowerCase();
-    return funcoes.filter(f => f.ativo && f.id !== OS_ID && f.nome.toLowerCase().includes(q));
+    return funcoes.filter(f => f.ativo && f.id !== OS_ID && f.id !== OS_AT_ID && f.nome.toLowerCase().includes(q));
   }, [funcoes, busca]);
 
   const chamadosFiltrados = useMemo(() => {
@@ -1297,9 +1607,9 @@ const ManutencaoPage: React.FC = () => {
     else if (filtroStatusChamado === 'aberto') lista = meusChamadosVisiveis.filter(c => c.status === 'aberto');
     else if (filtroStatusChamado === 'em_andamento') lista = meusChamadosVisiveis.filter(c => c.status === 'em_andamento');
     else lista = meusChamadosVisiveis;
-    if (filtroTipo === 'os') lista = lista.filter(c => c.funcaoId === OS_ID);
+    if (filtroTipo === 'os') lista = lista.filter(c => c.funcaoId === OS_ID || c.funcaoId === OS_AT_ID);
     else if (filtroTipo === 'livre') lista = lista.filter(c => c.funcaoId === 'livre');
-    else if (filtroTipo === 'personalizada') lista = lista.filter(c => c.funcaoId !== OS_ID && c.funcaoId !== 'livre');
+    else if (filtroTipo === 'personalizada') lista = lista.filter(c => c.funcaoId !== OS_ID && c.funcaoId !== OS_AT_ID && c.funcaoId !== 'livre');
     if (!busca.trim()) return lista;
     const q = busca.toLowerCase();
     return lista.filter(c =>
@@ -1359,11 +1669,30 @@ const ManutencaoPage: React.FC = () => {
     ativo: true,
   }), [userId]);
 
+  /* ── Assistência Técnica pré-montada ──────────────────────────────── */
+  const criarFuncaoOSAT = useCallback((): FuncaoManutencao => ({
+    id: OS_AT_ID,
+    nome: 'Assistência Técnica',
+    icone: '🔧',
+    cor: '#7B1FA2',
+    blocos: [
+      { uid: 'osat_bloco', tipo: 'os_assistencia_tecnica', label: 'O.S Assistência Técnica', obrigatorio: true },
+    ],
+    qrTipo: 'nenhum',
+    criadoPor: userId,
+    criadoEm: Date.now(),
+    ativo: true,
+  }), [userId]);
+
   const handleOSClick = useCallback(() => {
+    setOsModalAberto(true);
+  }, []);
+
+  const abrirOSPadrao = useCallback(() => {
+    setOsModalAberto(false);
     const osAtualizada = criarFuncaoOS();
     let funcaoOS = funcoes.find(f => f.id === OS_ID);
     if (funcaoOS) {
-      // Sincronizar blocos — garante que novos campos apareçam
       funcaoOS = { ...funcaoOS, blocos: osAtualizada.blocos };
       setFuncoes(prev => {
         const prox = prev.map(f => f.id === OS_ID ? funcaoOS! : f);
@@ -1380,6 +1709,28 @@ const ManutencaoPage: React.FC = () => {
     }
     setFormAberto(funcaoOS);
   }, [funcoes, criarFuncaoOS]);
+
+  const abrirOSAT = useCallback(() => {
+    setOsModalAberto(false);
+    const atAtualizada = criarFuncaoOSAT();
+    let funcaoAT = funcoes.find(f => f.id === OS_AT_ID);
+    if (funcaoAT) {
+      funcaoAT = { ...funcaoAT, blocos: atAtualizada.blocos };
+      setFuncoes(prev => {
+        const prox = prev.map(f => f.id === OS_AT_ID ? funcaoAT! : f);
+        salvar(FUNCOES_KEY, prox);
+        return prox;
+      });
+    } else {
+      funcaoAT = atAtualizada;
+      setFuncoes(prev => {
+        const prox = [...prev, funcaoAT!];
+        salvar(FUNCOES_KEY, prox);
+        return prox;
+      });
+    }
+    setFormAberto(funcaoAT);
+  }, [funcoes, criarFuncaoOSAT]);
 
   const toggleOsBloco = useCallback((uid: string) => {
     setOsOcultos(prev => {
@@ -1465,7 +1816,7 @@ const ManutencaoPage: React.FC = () => {
         title="Toque para ampliar o QR Code"
       >
         <QRCodeCanvas
-          value={`${globalThis.location.origin}/manutencao/form?chamado=${c.id}`}
+          value={`${globalThis.location.origin}/chamado/${c.protocolo}`}
           size={64}
           level="M"
           style={{ borderRadius:6 }}
@@ -1529,7 +1880,7 @@ const ManutencaoPage: React.FC = () => {
         {/* Botão editar */}
         {podeGerenciar && (
           <button
-            onClick={() => setEditandoChamado(c)}
+            onClick={() => pedirPin(() => setEditandoChamado(c))}
             style={{ display:'flex', alignItems:'center', justifyContent:'center', padding:'8px', background:'rgba(59,130,246,0.1)', border:'1.5px solid rgba(59,130,246,0.3)', borderRadius:10, color:'#2563eb', cursor:'pointer', width:36, height:36 }}
             title="Editar chamado"
           >
@@ -1598,7 +1949,7 @@ const ManutencaoPage: React.FC = () => {
         )}
 
         {podeGerenciar && (
-          <button className={styles.btnExcluir} onClick={() => { if (confirm('Excluir?')) excluirChamado(c.id); }} title="Excluir">
+          <button className={styles.btnExcluir} onClick={() => pedirPin(() => { if (confirm('Excluir?')) excluirChamado(c.id); })} title="Excluir">
             <Trash2 size={16} />
           </button>
         )}
@@ -1651,7 +2002,7 @@ const ManutencaoPage: React.FC = () => {
             <TilesRenderer
               prefs={tilesPrefs}
               tiles={[
-                ...(podeGerenciar && !busca ? [{
+                ...(podeGerenciar && !busca && tileVisivel('personalizar') ? [{
                   icone: <Plus size={52} style={{ filter: 'drop-shadow(0 3px 6px rgba(0,0,0,0.2))' }} />,
                   nome: 'Personalizar Manutenção',
                   desc: 'Crie campos e categorias',
@@ -1660,7 +2011,7 @@ const ManutencaoPage: React.FC = () => {
                   onHelp: undefined,
                   visivel: true,
                 }] : []),
-                ...(!busca || 'manutenção livre'.includes(busca.toLowerCase()) ? [{
+                ...(tileVisivel('livre') && (!busca || 'manutenção livre'.includes(busca.toLowerCase())) ? [{
                   icone: <span style={{ fontSize: 52, lineHeight: 1 }}>📋</span>,
                   nome: 'Manutenção Livre',
                   desc: 'Registro rápido sem template',
@@ -1669,7 +2020,7 @@ const ManutencaoPage: React.FC = () => {
                   onHelp: () => setTutorialFuncao('livre' as const),
                   visivel: true,
                 }] : []),
-                ...(!busca || 'checklist'.includes(busca.toLowerCase()) ? [{
+                ...(tileVisivel('checklist') && (!busca || 'checklist'.includes(busca.toLowerCase())) ? [{
                   icone: <ClipboardList size={52} style={{ filter: 'drop-shadow(0 3px 6px rgba(0,0,0,0.2))' }} />,
                   nome: 'Checklist',
                   desc: 'Listas de verificação',
@@ -1678,7 +2029,7 @@ const ManutencaoPage: React.FC = () => {
                   onHelp: () => setTutorialFuncao('checklist' as const),
                   visivel: true,
                 }] : []),
-                ...(!busca || 'ordem de serviço'.includes(busca.toLowerCase()) || 'os'.includes(busca.toLowerCase()) ? [{
+                ...(tileVisivel('os') && (!busca || 'ordem de serviço'.includes(busca.toLowerCase()) || 'os'.includes(busca.toLowerCase())) ? [{
                   icone: <span style={{ fontSize: 52, lineHeight: 1 }}>📋</span>,
                   nome: 'Ordem de Serviço',
                   desc: 'Gerencie ordens de serviço',
@@ -1687,7 +2038,7 @@ const ManutencaoPage: React.FC = () => {
                   onHelp: () => setTutorialFuncao('os' as const),
                   visivel: true,
                 }] : []),
-                ...(podeGerenciar && (!busca || 'funcionários'.includes(busca.toLowerCase())) ? [{
+                ...(podeGerenciar && tileVisivel('funcionarios') && (!busca || 'funcionários'.includes(busca.toLowerCase())) ? [{
                   icone: <Users size={52} style={{ filter: 'drop-shadow(0 3px 6px rgba(0,0,0,0.2))' }} />,
                   nome: 'Funcionários',
                   desc: 'Equipes e tarefas',
@@ -1696,12 +2047,21 @@ const ManutencaoPage: React.FC = () => {
                   onHelp: () => setTutorialFuncao('funcionarios' as const),
                   visivel: true,
                 }] : []),
+                ...(podeGerenciar && tileVisivel('maquinas') && (!busca || 'máquinas'.includes(busca.toLowerCase()) || 'maquinas'.includes(busca.toLowerCase()) || 'equipamento'.includes(busca.toLowerCase())) ? [{
+                  icone: <Settings size={52} style={{ filter: 'drop-shadow(0 3px 6px rgba(0,0,0,0.2))' }} />,
+                  nome: 'Cadastro de Máquinas',
+                  desc: 'Gerencie equipamentos',
+                  acao: '⚙️ Configurar',
+                  onClick: () => setCadMaquinasAberto(true),
+                  onHelp: undefined,
+                  visivel: true,
+                }] : []),
               ] as TileAction[]}
             />
           </div>
 
           {/* Custom tiles (funcoesFiltradas) — sempre em grid quadrado */}
-          {(funcoesFiltradas.length > 0 || (funcoesFiltradas.length === 0 && busca) || (funcoes.length === 0 && !podeGerenciar)) && (
+          {tileVisivel('custom') && (funcoesFiltradas.length > 0 || (funcoesFiltradas.length === 0 && busca) || (funcoes.length === 0 && !podeGerenciar)) && (
             <div className={styles.tilesGrid} style={{ marginTop: 0 }}>
               {funcoesFiltradas.map(funcao => (
               <div key={funcao.id} style={{ position: 'relative' }}>
@@ -1715,7 +2075,7 @@ const ManutencaoPage: React.FC = () => {
                   <div style={{ display:'flex', gap:6, marginTop:4 }} onClick={e => e.stopPropagation()}>
                     {podeGerenciar && (
                       <button style={{ background:'rgba(0,0,0,0.2)', border:'none', borderRadius:6, padding:'5px 10px', color:'#0D0D0D', cursor:'pointer', fontSize:10, fontWeight:800, display:'flex', alignItems:'center', gap:3 }}
-                        onClick={() => { setEditandoFuncao(funcao); setWizard(true); }}>
+                        onClick={() => pedirPin(() => { setEditandoFuncao(funcao); setWizard(true); })}>
                         <Edit2 size={11} /> Editar
                       </button>
                     )}
@@ -1725,7 +2085,7 @@ const ManutencaoPage: React.FC = () => {
                     </button>
                     {podeGerenciar && (
                       <button style={{ background:'rgba(0,0,0,0.2)', border:'none', borderRadius:6, padding:'5px 8px', color:'#0D0D0D', cursor:'pointer' }}
-                        onClick={() => setConfirmandoExclusao(funcao.id)}>
+                        onClick={() => pedirPin(() => setConfirmandoExclusao(funcao.id))}>
                         <Trash2 size={11} />
                       </button>
                     )}
@@ -1771,9 +2131,18 @@ const ManutencaoPage: React.FC = () => {
             <TilesConfigModal
               prefs={tilesPrefs}
               onUpdate={atualizarTilesPrefs}
-              onClose={() => setCfgAberto(false)}
+              onClose={() => { setCfgAberto(false); setTilesOcultos(carregarTilesOcultos()); }}
+              isMaster={podeConfigurarVisibilidade}
             />
           )}
+
+          {/* Modal Cadastro de Máquinas */}
+          {cadMaquinasAberto && (
+            <CadastroMaquinasModal onClose={() => setCadMaquinasAberto(false)} />
+          )}
+
+          {/* PIN de proteção */}
+          <PinModal aberto={pinAberto} onSucesso={pinSucesso} onFechar={pinFechar} />
 
           {/* Busca */}
           <div style={{ position:'relative', marginBottom: 12 }}>
@@ -1956,6 +2325,52 @@ const ManutencaoPage: React.FC = () => {
       )}
 
       {/* Modais */}
+
+      {/* ── Modal Seleção: OS Padrão ou Assistência Técnica ── */}
+      {osModalAberto && (
+        <div style={{ position:'fixed', inset:0, zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', background:'rgba(0,0,0,0.55)', backdropFilter:'blur(4px)' }}
+          onClick={() => setOsModalAberto(false)}>
+          <div style={{ background:'#fff', borderRadius:20, padding:'28px 24px', maxWidth:420, width:'92%', boxShadow:'0 20px 60px rgba(0,0,0,0.3)' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ textAlign:'center', marginBottom:20 }}>
+              <div style={{ fontSize:36, marginBottom:4 }}>📋</div>
+              <h2 style={{ margin:0, fontSize:18, fontWeight:900, color:'#111' }}>Qual modelo deseja preencher?</h2>
+              <p style={{ margin:'6px 0 0', fontSize:12, color:'#6b7280' }}>Escolha o tipo de Ordem de Serviço</p>
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+              {/* Card OS Padrão */}
+              <button type="button" onClick={abrirOSPadrao}
+                style={{ display:'flex', alignItems:'center', gap:14, padding:'16px 18px', background:'linear-gradient(135deg,#0D47A1,#1565C0)', color:'#fff', border:'none', borderRadius:14, cursor:'pointer', textAlign:'left', transition:'transform 0.15s' }}
+                onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.97)')}
+                onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}>
+                <div style={{ width:52, height:52, borderRadius:14, background:'rgba(255,255,255,0.2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:28, flexShrink:0 }}>📋</div>
+                <div>
+                  <div style={{ fontSize:15, fontWeight:900 }}>Ordem de Serviço Padrão</div>
+                  <div style={{ fontSize:11, fontWeight:500, opacity:0.85, marginTop:2 }}>Modelo genérico com todos os campos configuráveis</div>
+                </div>
+                <div style={{ marginLeft:'auto', fontSize:20, opacity:0.7 }}>›</div>
+              </button>
+              {/* Card Assistência Técnica */}
+              <button type="button" onClick={abrirOSAT}
+                style={{ display:'flex', alignItems:'center', gap:14, padding:'16px 18px', background:'linear-gradient(135deg,#7B1FA2,#9C27B0)', color:'#fff', border:'none', borderRadius:14, cursor:'pointer', textAlign:'left', transition:'transform 0.15s' }}
+                onMouseDown={e => (e.currentTarget.style.transform = 'scale(0.97)')}
+                onMouseUp={e => (e.currentTarget.style.transform = 'scale(1)')}>
+                <div style={{ width:52, height:52, borderRadius:14, background:'rgba(255,255,255,0.2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:28, flexShrink:0 }}>🔧</div>
+                <div>
+                  <div style={{ fontSize:15, fontWeight:900 }}>Assistência Técnica</div>
+                  <div style={{ fontSize:11, fontWeight:500, opacity:0.85, marginTop:2 }}>Modelo completo com materiais, valores e assinaturas</div>
+                </div>
+                <div style={{ marginLeft:'auto', fontSize:20, opacity:0.7 }}>›</div>
+              </button>
+            </div>
+            <button type="button" onClick={() => setOsModalAberto(false)}
+              style={{ width:'100%', marginTop:16, padding:'10px 0', background:'#f3f4f6', border:'1.5px solid #e5e7eb', borderRadius:10, fontSize:13, fontWeight:700, color:'#6b7280', cursor:'pointer' }}>
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
+
       {wizard && (
         <WizardCriar
           funcaoEditar={editandoFuncao ?? undefined}
@@ -1970,7 +2385,7 @@ const ManutencaoPage: React.FC = () => {
           adminId={usuario?.adminId} supervisorId={usuario?.supervisorId}
           onEnviar={abrirChamado}
           onCancelar={() => setFormAberto(null)}
-          statusAoEnviar={formAberto.id === OS_ID ? 'aberto' : 'concluido'}
+          statusAoEnviar={(formAberto.id === OS_ID || formAberto.id === OS_AT_ID) ? 'aberto' : 'concluido'}
           osNumeroExibir={formAberto.id === OS_ID ? String(Number(localStorage.getItem(OS_CONTADOR_KEY) || '0') + 1).padStart(6, '0') : undefined}
           osOcultos={formAberto.id === OS_ID ? osOcultos : undefined}
           onToggleBloco={formAberto.id === OS_ID ? toggleOsBloco : undefined}
@@ -2562,6 +2977,348 @@ const ManutencaoPage: React.FC = () => {
                       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
                         <div style={{ padding:'6px 8px', background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:6, fontSize:10, color:'#9ca3af' }}>👤 Testemunha 1</div>
                         <div style={{ padding:'6px 8px', background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:6, fontSize:10, color:'#9ca3af' }}>👤 Testemunha 2</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+
+            case 'os_assistencia_tecnica':
+              return (
+                <div key={bloco.uid} style={{ marginBottom:14 }}>
+                  {fieldLabel}
+                  <div style={{ border:'2px solid #d97706', borderRadius:14, overflow:'hidden', background:'#fff' }}>
+                    <div style={{ background:'linear-gradient(135deg,#d97706,#92400e)', color:'#fff', padding:'12px 14px', textAlign:'center' }}>
+                      <div style={{ fontSize:14, fontWeight:900, textTransform:'uppercase', letterSpacing:1.5 }}>🛠️ ORDEM DE SERVIÇO</div>
+                      <div style={{ fontSize:10, opacity:0.9, marginTop:2 }}>ASSISTÊNCIA TÉCNICA</div>
+                      <div style={{ fontSize:10, opacity:0.8, marginTop:4, fontFamily:'monospace', fontWeight:700 }}>Nº OSAT-...</div>
+                    </div>
+                    <div style={{ padding:12, display:'flex', flexDirection:'column', gap:8 }}>
+                      {/* 1 – Máquina */}
+                      <div style={{ background:'#fffbeb', borderRadius:8, padding:'8px 10px', border:'1.5px solid #fde68a' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#b45309', textTransform:'uppercase', marginBottom:4 }}>🖥️ 1 — Máquina / Equipamento</div>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Nome...</div>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Código...</div>
+                        </div>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:4, marginTop:4 }}>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Modelo...</div>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Marca...</div>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Localização...</div>
+                        </div>
+                      </div>
+                      {/* 2 – Técnico */}
+                      <div style={{ background:'#f0f4ff', borderRadius:8, padding:'8px 10px', border:'1.5px solid #c7d2fe' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#1e40af', textTransform:'uppercase', marginBottom:4 }}>👷 2 — Técnico do Chamado</div>
+                        <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Nome do técnico...</div>
+                        <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af', marginTop:4 }}>Descrição do problema...</div>
+                      </div>
+                      {/* 3 – Avaliação */}
+                      <div style={{ background:'#fef3c7', borderRadius:8, padding:'8px 10px', border:'1.5px solid #fde68a' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#b45309', textTransform:'uppercase', marginBottom:4 }}>📋 3 — Avaliação Técnico Terceirizado</div>
+                        <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Parecer técnico...</div>
+                      </div>
+                      {/* 4 – Compra de Material */}
+                      <div style={{ background:'#f0fdf4', borderRadius:8, padding:'8px 10px', border:'1.5px solid #bbf7d0' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#16a34a', textTransform:'uppercase', marginBottom:4 }}>🛒 4 — Compra de Material</div>
+                        <div style={{ display:'flex', gap:6 }}>
+                          <div style={{ padding:'6px 12px', background:'#dcfce7', border:'2px solid #16a34a', borderRadius:8, fontSize:11, fontWeight:700, color:'#15803d' }}>Sim</div>
+                          <div style={{ padding:'6px 12px', background:'#fff', border:'2px solid #d1d5db', borderRadius:8, fontSize:11, fontWeight:700, color:'#6b7280' }}>Não</div>
+                        </div>
+                      </div>
+                      {/* 5 – Prestadora */}
+                      <div style={{ background:'#faf5ff', borderRadius:8, padding:'8px 10px', border:'1.5px solid #e9d5ff' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#7c3aed', textTransform:'uppercase', marginBottom:4 }}>🏢 5 — Prestadora de Serviço</div>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Nome...</div>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>CNPJ...</div>
+                        </div>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4, marginTop:4 }}>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>E-mail...</div>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>WhatsApp...</div>
+                        </div>
+                      </div>
+                      {/* 6 – Prazo */}
+                      <div style={{ background:'#fff7ed', borderRadius:8, padding:'8px 10px', border:'1.5px solid #fed7aa' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#c2410c', textTransform:'uppercase', marginBottom:4 }}>📅 6 — Prazo</div>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Data limite...</div>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Observação...</div>
+                        </div>
+                      </div>
+                      {/* 7 – Gestor */}
+                      <div style={{ background:'#f0f4ff', borderRadius:8, padding:'8px 10px', border:'1.5px solid #c7d2fe' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#1e40af', textTransform:'uppercase', marginBottom:4 }}>✅ 7 — Gestor Validador</div>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Nome...</div>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Cargo...</div>
+                        </div>
+                      </div>
+                      {/* 8 – Valor */}
+                      <div style={{ background:'#f0fdf4', border:'2px solid #86efac', borderRadius:8, padding:8, textAlign:'center' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#16a34a', textTransform:'uppercase' }}>💰 Valor Total</div>
+                        <div style={{ fontSize:16, fontWeight:900, fontFamily:'monospace', color:'#16a34a' }}>R$ 0,00</div>
+                      </div>
+                      {/* 9 – Status / Prioridade */}
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                        <div style={{ padding:'6px 8px', background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:6, fontSize:10, color:'#9ca3af' }}>Status...</div>
+                        <div style={{ padding:'6px 8px', background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:6, fontSize:10, color:'#9ca3af' }}>Prioridade...</div>
+                      </div>
+                      {/* Assinaturas */}
+                      <div style={{ background:'#f9fafb', borderRadius:8, padding:'8px 10px', border:'1.5px solid #e5e7eb' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#6b7280', textTransform:'uppercase', textAlign:'center', marginBottom:4 }}>✍️ Assinaturas</div>
+                        <div style={{ display:'flex', gap:8 }}>
+                          <div style={{ flex:1, height:40, border:'2px dashed #fde68a', borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#9ca3af', fontWeight:600 }}>Gestor</div>
+                          <div style={{ flex:1, height:40, border:'2px dashed #c7d2fe', borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#9ca3af', fontWeight:600 }}>Técnico</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+
+            /* ── O.S GERAL (preview) ── */
+            case 'ordem_servico':
+              return (
+                <div key={bloco.uid} style={{ marginBottom:14 }}>
+                  {fieldLabel}
+                  <div style={{ border:'2px solid #2563eb', borderRadius:14, overflow:'hidden', background:'#fff' }}>
+                    <div style={{ background:'linear-gradient(135deg,#2563eb,#1e40af)', color:'#fff', padding:'12px 14px', textAlign:'center' }}>
+                      <div style={{ fontSize:14, fontWeight:900, textTransform:'uppercase', letterSpacing:1.5 }}>📋 ORDEM DE SERVIÇO</div>
+                      <div style={{ fontSize:10, opacity:0.9, marginTop:2 }}>GERAL</div>
+                      <div style={{ fontSize:10, opacity:0.8, marginTop:4, fontFamily:'monospace', fontWeight:700 }}>Nº OSG-...</div>
+                    </div>
+                    <div style={{ padding:12, display:'flex', flexDirection:'column', gap:8 }}>
+                      <div style={{ background:'#eff6ff', borderRadius:8, padding:'8px 10px', border:'1.5px solid #bfdbfe' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#1e40af', textTransform:'uppercase', marginBottom:4 }}>👤 1 — Solicitante</div>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Nome...</div>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Setor...</div>
+                        </div>
+                      </div>
+                      <div style={{ background:'#f8fafc', borderRadius:8, padding:'8px 10px', border:'1.5px solid #e2e8f0' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#1e40af', textTransform:'uppercase', marginBottom:4 }}>📝 2 — Descrição do Serviço</div>
+                        <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Descrição...</div>
+                      </div>
+                      <div style={{ background:'#fefce8', borderRadius:8, padding:'8px 10px', border:'1.5px solid #fef08a' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#1e40af', textTransform:'uppercase', marginBottom:4 }}>📍 3 — Local</div>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Bloco...</div>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Andar...</div>
+                        </div>
+                      </div>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                        <div style={{ padding:'6px 8px', background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:6, fontSize:10, color:'#9ca3af' }}>Status...</div>
+                        <div style={{ padding:'6px 8px', background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:6, fontSize:10, color:'#9ca3af' }}>Prioridade...</div>
+                      </div>
+                      <div style={{ background:'#f9fafb', borderRadius:8, padding:'8px 10px', border:'1.5px solid #e5e7eb' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#6b7280', textTransform:'uppercase', textAlign:'center', marginBottom:4 }}>✍️ Assinaturas</div>
+                        <div style={{ display:'flex', gap:8 }}>
+                          <div style={{ flex:1, height:40, border:'2px dashed #bfdbfe', borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#9ca3af', fontWeight:600 }}>Solicitante</div>
+                          <div style={{ flex:1, height:40, border:'2px dashed #c7d2fe', borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#9ca3af', fontWeight:600 }}>Responsável</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+
+            /* ── O.S MANUTENÇÃO CORRETIVA (preview) ── */
+            case 'os_manutencao_corretiva':
+              return (
+                <div key={bloco.uid} style={{ marginBottom:14 }}>
+                  {fieldLabel}
+                  <div style={{ border:'2px solid #dc2626', borderRadius:14, overflow:'hidden', background:'#fff' }}>
+                    <div style={{ background:'linear-gradient(135deg,#dc2626,#991b1b)', color:'#fff', padding:'12px 14px', textAlign:'center' }}>
+                      <div style={{ fontSize:14, fontWeight:900, textTransform:'uppercase', letterSpacing:1.5 }}>🔧 ORDEM DE SERVIÇO</div>
+                      <div style={{ fontSize:10, opacity:0.9, marginTop:2 }}>MANUTENÇÃO CORRETIVA</div>
+                      <div style={{ fontSize:10, opacity:0.8, marginTop:4, fontFamily:'monospace', fontWeight:700 }}>Nº OSMC-...</div>
+                    </div>
+                    <div style={{ padding:12, display:'flex', flexDirection:'column', gap:8 }}>
+                      <div style={{ background:'#fef2f2', borderRadius:8, padding:'8px 10px', border:'1.5px solid #fecaca' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#dc2626', textTransform:'uppercase', marginBottom:4 }}>🖥️ 1 — Equipamento com Defeito</div>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Equipamento...</div>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Código...</div>
+                        </div>
+                      </div>
+                      <div style={{ background:'#fff7ed', borderRadius:8, padding:'8px 10px', border:'1.5px solid #fed7aa' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#dc2626', textTransform:'uppercase', marginBottom:4 }}>⚠️ 2 — Defeito Reportado</div>
+                        <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Descrição do defeito...</div>
+                      </div>
+                      <div style={{ background:'#fef3c7', borderRadius:8, padding:'8px 10px', border:'1.5px solid #fde68a' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#dc2626', textTransform:'uppercase', marginBottom:4 }}>🔍 3 — Diagnóstico / Causa</div>
+                        <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Causa identificada...</div>
+                      </div>
+                      <div style={{ background:'#f0fdf4', borderRadius:8, padding:'8px 10px', border:'1.5px solid #bbf7d0' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#dc2626', textTransform:'uppercase', marginBottom:4 }}>🛠️ 4 — Ação Corretiva</div>
+                        <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Serviço executado...</div>
+                      </div>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:6 }}>
+                        <div style={{ padding:'6px 8px', background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:6, fontSize:10, color:'#9ca3af' }}>Status...</div>
+                        <div style={{ padding:'6px 8px', background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:6, fontSize:10, color:'#9ca3af' }}>Prioridade...</div>
+                      </div>
+                      <div style={{ background:'#f9fafb', borderRadius:8, padding:'8px 10px', border:'1.5px solid #e5e7eb' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#6b7280', textTransform:'uppercase', textAlign:'center', marginBottom:4 }}>✍️ Assinaturas</div>
+                        <div style={{ display:'flex', gap:8 }}>
+                          <div style={{ flex:1, height:40, border:'2px dashed #fecaca', borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#9ca3af', fontWeight:600 }}>Técnico</div>
+                          <div style={{ flex:1, height:40, border:'2px dashed #fecaca', borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#9ca3af', fontWeight:600 }}>Aprovador</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+
+            /* ── O.S MANUTENÇÃO PREVENTIVA (preview) ── */
+            case 'os_manutencao_preventiva':
+              return (
+                <div key={bloco.uid} style={{ marginBottom:14 }}>
+                  {fieldLabel}
+                  <div style={{ border:'2px solid #16a34a', borderRadius:14, overflow:'hidden', background:'#fff' }}>
+                    <div style={{ background:'linear-gradient(135deg,#16a34a,#15803d)', color:'#fff', padding:'12px 14px', textAlign:'center' }}>
+                      <div style={{ fontSize:14, fontWeight:900, textTransform:'uppercase', letterSpacing:1.5 }}>🔄 ORDEM DE SERVIÇO</div>
+                      <div style={{ fontSize:10, opacity:0.9, marginTop:2 }}>MANUTENÇÃO PREVENTIVA</div>
+                      <div style={{ fontSize:10, opacity:0.8, marginTop:4, fontFamily:'monospace', fontWeight:700 }}>Nº OSMP-...</div>
+                    </div>
+                    <div style={{ padding:12, display:'flex', flexDirection:'column', gap:8 }}>
+                      <div style={{ background:'#f0fdf4', borderRadius:8, padding:'8px 10px', border:'1.5px solid #bbf7d0' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#16a34a', textTransform:'uppercase', marginBottom:4 }}>🖥️ 1 — Equipamento</div>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Nome...</div>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Código...</div>
+                        </div>
+                      </div>
+                      <div style={{ background:'#eff6ff', borderRadius:8, padding:'8px 10px', border:'1.5px solid #bfdbfe' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#16a34a', textTransform:'uppercase', marginBottom:4 }}>📋 2 — Tipo de Manutenção</div>
+                        <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Selecione...</div>
+                      </div>
+                      <div style={{ background:'#fefce8', borderRadius:8, padding:'8px 10px', border:'1.5px solid #fef08a' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#16a34a', textTransform:'uppercase', marginBottom:4 }}>✅ 3 — Checklist de Verificação</div>
+                        <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                          <div style={{ display:'grid', gridTemplateColumns:'2fr 60px 2fr', gap:4 }}>
+                            <div style={{ padding:'4px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:4, fontSize:10, color:'#9ca3af' }}>Item...</div>
+                            <div style={{ padding:'4px 8px', background:'#dcfce7', border:'1px solid #bbf7d0', borderRadius:4, fontSize:10, color:'#15803d', fontWeight:700, textAlign:'center' }}>✅ OK</div>
+                            <div style={{ padding:'4px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:4, fontSize:10, color:'#9ca3af' }}>Obs...</div>
+                          </div>
+                        </div>
+                        <div style={{ marginTop:6, fontSize:10, color:'#16a34a', fontWeight:700, textAlign:'center', border:'1.5px dashed #16a34a', borderRadius:6, padding:4 }}>+ Adicionar Item</div>
+                      </div>
+                      <div style={{ background:'#faf5ff', borderRadius:8, padding:'8px 10px', border:'1.5px solid #e9d5ff' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#16a34a', textTransform:'uppercase', marginBottom:4 }}>🔁 4 — Frequência</div>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Frequência...</div>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Próxima...</div>
+                        </div>
+                      </div>
+                      <div style={{ background:'#f9fafb', borderRadius:8, padding:'8px 10px', border:'1.5px solid #e5e7eb' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#6b7280', textTransform:'uppercase', textAlign:'center', marginBottom:4 }}>✍️ Assinaturas</div>
+                        <div style={{ display:'flex', gap:8 }}>
+                          <div style={{ flex:1, height:40, border:'2px dashed #bbf7d0', borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#9ca3af', fontWeight:600 }}>Técnico</div>
+                          <div style={{ flex:1, height:40, border:'2px dashed #bbf7d0', borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#9ca3af', fontWeight:600 }}>Supervisor</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+
+            /* ── O.S INSTALAÇÃO (preview) ── */
+            case 'os_instalacao':
+              return (
+                <div key={bloco.uid} style={{ marginBottom:14 }}>
+                  {fieldLabel}
+                  <div style={{ border:'2px solid #0891b2', borderRadius:14, overflow:'hidden', background:'#fff' }}>
+                    <div style={{ background:'linear-gradient(135deg,#0891b2,#0e7490)', color:'#fff', padding:'12px 14px', textAlign:'center' }}>
+                      <div style={{ fontSize:14, fontWeight:900, textTransform:'uppercase', letterSpacing:1.5 }}>📦 ORDEM DE SERVIÇO</div>
+                      <div style={{ fontSize:10, opacity:0.9, marginTop:2 }}>INSTALAÇÃO</div>
+                      <div style={{ fontSize:10, opacity:0.8, marginTop:4, fontFamily:'monospace', fontWeight:700 }}>Nº OSIN-...</div>
+                    </div>
+                    <div style={{ padding:12, display:'flex', flexDirection:'column', gap:8 }}>
+                      <div style={{ background:'#ecfeff', borderRadius:8, padding:'8px 10px', border:'1.5px solid #a5f3fc' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#0891b2', textTransform:'uppercase', marginBottom:4 }}>📦 1 — Equipamento a Instalar</div>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Nome...</div>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Marca/Mod...</div>
+                        </div>
+                      </div>
+                      <div style={{ background:'#fefce8', borderRadius:8, padding:'8px 10px', border:'1.5px solid #fef08a' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#0891b2', textTransform:'uppercase', marginBottom:4 }}>📍 2 — Local de Instalação</div>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Bloco...</div>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Andar...</div>
+                        </div>
+                      </div>
+                      <div style={{ background:'#f0f4ff', borderRadius:8, padding:'8px 10px', border:'1.5px solid #c7d2fe' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#0891b2', textTransform:'uppercase', marginBottom:4 }}>⚡ 3 — Requisitos Técnicos</div>
+                        <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Infraestrutura necessária...</div>
+                      </div>
+                      <div style={{ background:'#f0fdf4', borderRadius:8, padding:'8px 10px', border:'1.5px solid #bbf7d0' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#0891b2', textTransform:'uppercase', marginBottom:4 }}>✅ 6 — Teste de Funcionamento</div>
+                        <div style={{ display:'flex', gap:4 }}>
+                          <div style={{ padding:'4px 8px', background:'#dcfce7', border:'2px solid #16a34a', borderRadius:6, fontSize:10, fontWeight:700, color:'#15803d' }}>Sim, OK</div>
+                          <div style={{ padding:'4px 8px', background:'#fff', border:'2px solid #d1d5db', borderRadius:6, fontSize:10, fontWeight:700, color:'#6b7280' }}>Ressalvas</div>
+                          <div style={{ padding:'4px 8px', background:'#fff', border:'2px solid #d1d5db', borderRadius:6, fontSize:10, fontWeight:700, color:'#6b7280' }}>Não</div>
+                        </div>
+                      </div>
+                      <div style={{ background:'#f9fafb', borderRadius:8, padding:'8px 10px', border:'1.5px solid #e5e7eb' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#6b7280', textTransform:'uppercase', textAlign:'center', marginBottom:4 }}>✍️ Assinaturas</div>
+                        <div style={{ display:'flex', gap:8 }}>
+                          <div style={{ flex:1, height:40, border:'2px dashed #a5f3fc', borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#9ca3af', fontWeight:600 }}>Instalador</div>
+                          <div style={{ flex:1, height:40, border:'2px dashed #a5f3fc', borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#9ca3af', fontWeight:600 }}>Responsável</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+
+            /* ── O.S VISTORIA (preview) ── */
+            case 'os_vistoria':
+              return (
+                <div key={bloco.uid} style={{ marginBottom:14 }}>
+                  {fieldLabel}
+                  <div style={{ border:'2px solid #7c3aed', borderRadius:14, overflow:'hidden', background:'#fff' }}>
+                    <div style={{ background:'linear-gradient(135deg,#7c3aed,#6d28d9)', color:'#fff', padding:'12px 14px', textAlign:'center' }}>
+                      <div style={{ fontSize:14, fontWeight:900, textTransform:'uppercase', letterSpacing:1.5 }}>🔍 ORDEM DE SERVIÇO</div>
+                      <div style={{ fontSize:10, opacity:0.9, marginTop:2 }}>VISTORIA</div>
+                      <div style={{ fontSize:10, opacity:0.8, marginTop:4, fontFamily:'monospace', fontWeight:700 }}>Nº OSVI-...</div>
+                    </div>
+                    <div style={{ padding:12, display:'flex', flexDirection:'column', gap:8 }}>
+                      <div style={{ background:'#faf5ff', borderRadius:8, padding:'8px 10px', border:'1.5px solid #e9d5ff' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#7c3aed', textTransform:'uppercase', marginBottom:4 }}>📋 1 — Tipo de Vistoria</div>
+                        <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Selecione...</div>
+                      </div>
+                      <div style={{ background:'#fefce8', borderRadius:8, padding:'8px 10px', border:'1.5px solid #fef08a' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#7c3aed', textTransform:'uppercase', marginBottom:4 }}>📍 2 — Local Vistoriado</div>
+                        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:4 }}>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Bloco/Área...</div>
+                          <div style={{ padding:'6px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:6, fontSize:11, color:'#9ca3af' }}>Responsável...</div>
+                        </div>
+                      </div>
+                      <div style={{ background:'#f0fdf4', borderRadius:8, padding:'8px 10px', border:'1.5px solid #bbf7d0' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#7c3aed', textTransform:'uppercase', marginBottom:4 }}>✅ 3 — Itens da Vistoria</div>
+                        <div style={{ display:'grid', gridTemplateColumns:'2fr 80px 2fr', gap:4 }}>
+                          <div style={{ padding:'4px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:4, fontSize:10, color:'#9ca3af' }}>Área/Item...</div>
+                          <div style={{ padding:'4px 8px', background:'#dcfce7', border:'1px solid #bbf7d0', borderRadius:4, fontSize:10, color:'#15803d', fontWeight:700, textAlign:'center' }}>✅ Bom</div>
+                          <div style={{ padding:'4px 8px', background:'#fff', border:'1px solid #e5e7eb', borderRadius:4, fontSize:10, color:'#9ca3af' }}>Obs...</div>
+                        </div>
+                        <div style={{ marginTop:6, fontSize:10, color:'#7c3aed', fontWeight:700, textAlign:'center', border:'1.5px dashed #7c3aed', borderRadius:6, padding:4 }}>+ Adicionar Item</div>
+                      </div>
+                      <div style={{ background:'#faf5ff', borderRadius:8, padding:'8px 10px', border:'1.5px solid #e9d5ff' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#7c3aed', textTransform:'uppercase', marginBottom:4 }}>📊 5 — Resultado</div>
+                        <div style={{ display:'flex', gap:4 }}>
+                          <div style={{ padding:'4px 8px', background:'#f5f3ff', border:'2px solid #7c3aed', borderRadius:6, fontSize:10, fontWeight:700, color:'#6d28d9' }}>✅ Aprovado</div>
+                          <div style={{ padding:'4px 8px', background:'#fff', border:'2px solid #d1d5db', borderRadius:6, fontSize:10, fontWeight:700, color:'#6b7280' }}>⚠️ Ressalvas</div>
+                          <div style={{ padding:'4px 8px', background:'#fff', border:'2px solid #d1d5db', borderRadius:6, fontSize:10, fontWeight:700, color:'#6b7280' }}>❌ Reprovado</div>
+                        </div>
+                      </div>
+                      <div style={{ background:'#f9fafb', borderRadius:8, padding:'8px 10px', border:'1.5px solid #e5e7eb' }}>
+                        <div style={{ fontSize:9, fontWeight:900, color:'#6b7280', textTransform:'uppercase', textAlign:'center', marginBottom:4 }}>✍️ Assinaturas</div>
+                        <div style={{ display:'flex', gap:8 }}>
+                          <div style={{ flex:1, height:40, border:'2px dashed #e9d5ff', borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#9ca3af', fontWeight:600 }}>Vistoriador</div>
+                          <div style={{ flex:1, height:40, border:'2px dashed #e9d5ff', borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, color:'#9ca3af', fontWeight:600 }}>Responsável</div>
+                        </div>
                       </div>
                     </div>
                   </div>
