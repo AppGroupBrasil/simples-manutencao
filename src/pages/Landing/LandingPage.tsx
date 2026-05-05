@@ -50,7 +50,7 @@ const LandingPage: React.FC = () => {
       <header className={styles.header}>
         <div className={styles.headerInner}>
           <div className={styles.logo}>
-            <img src="/logos/logo.png" alt="Logo" className={styles.logoIcon} style={{ height: 28, objectFit: 'contain', filter: 'drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000)' }} />
+            <img src="/logos/simples-manutencao.png?v=2" alt="Logo" className={styles.logoIcon} style={{ height: 28, objectFit: 'contain' }} />
             <span className={styles.logoText}>Simples <strong>Manutenção</strong></span>
           </div>
 
@@ -150,7 +150,7 @@ const LandingPage: React.FC = () => {
               <span className={styles.mockupDot} style={{ background: '#ff5f57' }} />
               <span className={styles.mockupDot} style={{ background: '#ffbd2e' }} />
               <span className={styles.mockupDot} style={{ background: '#28ca41' }} />
-              <span className={styles.mockupTitle}><img src="/logos/logo.png" alt="" style={{ height: 14, objectFit: 'contain', verticalAlign: 'middle', marginRight: 4, filter: 'drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000)' }} /> S. Manutenção</span>
+              <span className={styles.mockupTitle}><img src="/logos/simples-manutencao.png?v=2" alt="" style={{ height: 14, objectFit: 'contain', verticalAlign: 'middle', marginRight: 4 }} /> S. Manutenção</span>
             </div>
             <div className={styles.mockupBody}>
               <div className={styles.mockupCard} style={{ borderLeft: '4px solid #22c55e' }}>
@@ -642,7 +642,7 @@ const LandingPage: React.FC = () => {
 
           <div className={styles.ecoGrid}>
             {[
-              { src: '/logos/Logo Manutenção.png',          nome: 'Simples Manutenção',  url: 'https://simplesmanutencao.com.br'     },
+              { src: '/logos/simples-manutencao.png?v=2',       nome: 'Simples Manutenção',  url: 'https://simplesmanutencao.com.br'     },
               { src: '/logos/Logo App Condomínio.png',      nome: 'App Condomínio',      url: 'https://appcondominio.com.br'         },
               { src: '/logos/Logo App Síndico.png',         nome: 'App Síndico',         url: 'https://appsindico.com.br'            },
               { src: '/logos/App Portaria Logo.png',        nome: 'App Portaria',        url: 'https://appportaria.com.br'           },
@@ -675,7 +675,7 @@ const LandingPage: React.FC = () => {
       <footer className={styles.footer}>
         <div className={styles.footerInner}>
           <div className={styles.footerLogo}>
-            <img src="/logos/logo.png" alt="Logo" style={{ height: 24, objectFit: 'contain', filter: 'drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000)' }} />
+            <img src="/logos/simples-manutencao.png?v=2" alt="Logo" style={{ height: 24, objectFit: 'contain' }} />
             <span>Simples <strong>Manutenção</strong></span>
           </div>
           <p className={styles.footerTagline}>Gestão de manutenção simples e eficiente para sua equipe.</p>

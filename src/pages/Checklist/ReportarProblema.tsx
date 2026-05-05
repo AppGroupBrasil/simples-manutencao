@@ -145,7 +145,6 @@ const ReportarProblema: React.FC<Props> = ({ itemTexto, onSalvar, onCancelar }) 
                     type="file"
                     accept="image/*"
                     multiple
-                    capture="environment"
                     onChange={adicionarFotos}
                     style={{ display:'none' }}
                   />

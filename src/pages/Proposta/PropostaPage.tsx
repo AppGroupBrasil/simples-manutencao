@@ -65,7 +65,7 @@ const PropostaPage: React.FC = () => {
           <button onClick={() => navigate('/')} style={{ background: '#27272a', border: 'none', borderRadius: 8, color: '#a1a1aa', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', fontSize: 13, fontWeight: 600 }}>
             <ChevronLeft size={15} /> Voltar
           </button>
-          <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}><img src="/logos/logo.png" alt="Logo" style={{ height: 22, objectFit: 'contain', filter: 'drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000)' }} /> Simples <strong style={{ color: '#FFD600' }}>Manutenção</strong></span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: '#fff', display: 'flex', alignItems: 'center', gap: 6 }}><img src="/logos/simples-manutencao.png?v=2" alt="Logo" style={{ height: 22, objectFit: 'contain' }} /> Simples <strong style={{ color: '#FFD600' }}>Manutenção</strong></span>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={() => navigate('/contrato')} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', background: 'transparent', border: '1px solid #3f3f46', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', color: '#a1a1aa' }}>
@@ -258,7 +258,7 @@ const PropostaPage: React.FC = () => {
       {/* ── CTA FINAL ── */}
       <section style={{ background: 'linear-gradient(135deg,#0D0D0D 0%,#1a1a1a 100%)', padding: '96px 32px', textAlign: 'center', borderTop: '1px solid #27272a' }}>
         <div style={{ maxWidth: 680, margin: '0 auto' }}>
-          <img src="/logos/logo.png" alt="Simples Manutenção" style={{ height: 64, objectFit: 'contain', marginBottom: 20, filter: 'drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000)' }} />
+          <img src="/logos/simples-manutencao.png?v=2" alt="Simples Manutenção" style={{ height: 64, objectFit: 'contain', marginBottom: 20 }} />
           <h2 style={{ fontSize: 'clamp(28px,5vw,42px)', fontWeight: 900, color: '#fff', margin: '0 0 16px', letterSpacing: '-1px' }}>
             Pronto para começar?
           </h2>

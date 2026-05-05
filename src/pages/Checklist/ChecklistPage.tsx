@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Plus, Check, ClipboardList, History, Settings, Trash2,
   Search, X, BarChart3, FileDown, Hash, Share2, Eye,
-  CheckCircle2, Edit2, RefreshCw, PlayCircle, Calendar, FileText,
+  CheckCircle2, Edit2, RefreshCw, PlayCircle, Calendar, FileText, Printer,
 } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import {
@@ -13,10 +13,52 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { usePin, PinModal } from '../../components/PinProtecao';
 import ReportarProblema from './ReportarProblema';
+import { visualizarChecklist } from '../../utils/visualizarChecklist';
 import type { Checklist, ItemChecklist, ProblemaItem } from './types';
 import styles from './Checklist.module.css';
 
 const CHECKLISTS_KEY = 'sm_checklists_v1';
+const TEMPLATES_KEY = 'sm_checklist_templates_v1';
+
+type TemplatePersonalizado = {
+  id: string;
+  titulo: string;
+  equip: string;
+  codigoEquip: string;
+  item: string;
+  local: string;
+  responsavel: string;
+  linhas: { descricao: string; dataProg: string; dataConc: string; obs: string; fotos: string[]; resp: string; status: 'pendente' | 'ok' | 'nok' }[];
+  criadoEm: string;
+};
+
+type ChecagemRegistrada = {
+  id: string;
+  templateId?: string;
+  titulo: string;
+  equip: string;
+  codigoEquip: string;
+  local: string;
+  responsavel: string;
+  linhas: { descricao: string; dataProg: string; dataConc: string; obs: string; resp: string; status: 'pendente' | 'ok' | 'nok' }[];
+  registradoEm: string;
+};
+
+const HISTORICO_CHECAGENS_KEY = 'sm_checagens_v1';
+
+function carregarChecagens(): ChecagemRegistrada[] {
+  try { const v = localStorage.getItem(HISTORICO_CHECAGENS_KEY); return v ? JSON.parse(v) : []; } catch { return []; }
+}
+function salvarChecagens(lista: ChecagemRegistrada[]) {
+  try { localStorage.setItem(HISTORICO_CHECAGENS_KEY, JSON.stringify(lista)); } catch { /* ignore */ }
+}
+
+function carregarTemplates(): TemplatePersonalizado[] {
+  try { const v = localStorage.getItem(TEMPLATES_KEY); return v ? JSON.parse(v) : []; } catch { return []; }
+}
+function salvarTemplates(lista: TemplatePersonalizado[]) {
+  try { localStorage.setItem(TEMPLATES_KEY, JSON.stringify(lista)); } catch { /* ignore */ }
+}
 
 function carregar(): Checklist[] {
   try { const v = localStorage.getItem(CHECKLISTS_KEY); return v ? JSON.parse(v) : []; } catch { return []; }
@@ -230,6 +272,26 @@ const ChecklistPage: React.FC = () => {
   const [editResp, setEditResp] = useState('');
   const [preenchendoChecklist, setPreenchendoChecklist] = useState<string | null>(null);
   const [geoLocal, setGeoLocal] = useState<{ lat: number; lng: number; endereco?: string } | null>(null);
+  const [modalPersonalizado, setModalPersonalizado] = useState(false);
+  const [tituloPersonalizado, setTituloPersonalizado] = useState('');
+  const [equipPersonalizado, setEquipPersonalizado] = useState('');
+  const [codigoEquipPersonalizado, setCodigoEquipPersonalizado] = useState('');
+  const [itemPersonalizado, setItemPersonalizado] = useState('');
+  const [localPersonalizado, setLocalPersonalizado] = useState('');
+  const [responsavelPersonalizado, setResponsavelPersonalizado] = useState('');
+  const [checklistPersonalizado, setChecklistPersonalizado] = useState('');
+  const [modalTextoChecklist, setModalTextoChecklist] = useState(false);
+  const [dataProgramadaPersonalizado, setDataProgramadaPersonalizado] = useState('');
+  const [dataConcluidaPersonalizado, setDataConcluidaPersonalizado] = useState('');
+  const [linhasPersonalizado, setLinhasPersonalizado] = useState<{ descricao: string; dataProg: string; dataConc: string; obs: string; fotos: string[]; resp: string; status: 'pendente' | 'ok' | 'nok' }[]>([{ descricao: '', dataProg: '', dataConc: '', obs: '', fotos: [], resp: '', status: 'pendente' }]);
+  const [modalData, setModalData] = useState<{ idx: number; tipo: 'prog' | 'conc' } | null>(null);
+  const [modalDataTemp, setModalDataTemp] = useState('');
+  const [modalDetalheIdx, setModalDetalheIdx] = useState<number | null>(null);
+  const [templates, setTemplates] = useState<TemplatePersonalizado[]>(() => carregarTemplates());
+  const [modalVerTemplates, setModalVerTemplates] = useState(false);
+  const [checagens, setChecagens] = useState<ChecagemRegistrada[]>(() => carregarChecagens());
+  const [modalHistorico, setModalHistorico] = useState(false);
+  const [modalQRShare, setModalQRShare] = useState<string | null>(null);
 
   // Abre checklist automaticamente se vier via link compartilhado (?id=checklistId)
   useEffect(() => {
@@ -921,9 +983,9 @@ const ChecklistPage: React.FC = () => {
                 <FileDown size={16} />
               </button>
               <button
-                onClick={() => setPreviewChecklist(cl)}
+                onClick={() => visualizarChecklist(cl)}
                 style={{ display:'flex', alignItems:'center', justifyContent:'center', padding:'8px', background:'rgba(107,114,128,0.08)', border:'1.5px solid rgba(107,114,128,0.3)', color:'#4b5563', borderRadius:10, cursor:'pointer', width:36, height:36 }}
-                title="Pré-visualizar"
+                title="Visualizar checklist"
               >
                 <Eye size={16} />
               </button>
@@ -1084,6 +1146,9 @@ const ChecklistPage: React.FC = () => {
         </button>
         <button className={`${styles.tab} ${abaAtiva === 'criar' ? styles.tabAtivo : ''}`} onClick={() => setAbaAtiva('criar')}>
           <Plus size={18} /> Criar Novo
+        </button>
+        <button className={`${styles.tab}`} onClick={() => setModalPersonalizado(true)}>
+          <Settings size={18} /> Checklist Personalizado
         </button>
         <button className={`${styles.tab} ${abaAtiva === 'historico' ? styles.tabAtivo : ''}`} onClick={() => setAbaAtiva('historico')}>
           <History size={18} /> Histórico {concluidos.length > 0 && <span className={styles.tabBadge}>{concluidos.length}</span>}
@@ -1520,6 +1585,560 @@ const ChecklistPage: React.FC = () => {
       )}
 
       <PinModal aberto={pinAberto} onSucesso={pinSucesso} onFechar={pinFechar} />
+
+      {/* Modal Checklist Personalizado */}
+      {modalPersonalizado && (
+        <div className={styles.pvOverlay} onClick={() => setModalPersonalizado(false)}>
+          <div className={styles.pvModal} onClick={e => e.stopPropagation()} style={{ maxWidth: 700 }}>
+            <div className={styles.pvHeader}>
+              <div className={styles.pvHeaderTopo}>
+                <Settings size={22} style={{ flexShrink: 0 }} />
+                <span style={{ fontWeight: 900, fontSize: 18 }}>Checklist Personalizado</span>
+                <button
+                  onClick={() => setModalPersonalizado(false)}
+                  style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            <div style={{ padding: '20px 20px 24px' }}>
+              {/* === CABEÇALHO === */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <span style={{ fontWeight: 800, fontSize: 13, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1 }}>Cabeçalho</span>
+                <button onClick={() => {
+                  setTituloPersonalizado(''); setEquipPersonalizado(''); setCodigoEquipPersonalizado('');
+                  setItemPersonalizado(''); setLocalPersonalizado(''); setResponsavelPersonalizado('');
+                  setLinhasPersonalizado([{ descricao: '', dataProg: '', dataConc: '', obs: '', fotos: [], resp: '', status: 'pendente' }]);
+                }} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 8, border: '2px solid #e5e7eb', background: '#f9fafb', cursor: 'pointer', fontSize: 12, color: '#6b7280' }}>
+                  <RefreshCw size={13} /> Novo / Limpar
+                </button>
+              </div>
+              <label style={{ display: 'block', fontWeight: 700, fontSize: 13, marginBottom: 8, color: 'var(--cor-texto, #111)' }}>
+                Título do Checklist
+              </label>
+              <input
+                type="text"
+                placeholder="Ex: Inspeção Mensal de Equipamentos"
+                value={tituloPersonalizado}
+                onChange={e => setTituloPersonalizado(e.target.value)}
+                style={{
+                  width: '100%', padding: '10px 14px', borderRadius: 10,
+                  border: '2px solid #e5e7eb', fontSize: 15, outline: 'none',
+                  boxSizing: 'border-box',
+                }}
+                autoFocus
+              />
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 16 }}>
+                <div>
+                  <label style={{ display: 'block', fontWeight: 700, fontSize: 13, marginBottom: 8, color: 'var(--cor-texto, #111)' }}>
+                    Equipamento
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Compressor"
+                    value={equipPersonalizado}
+                    onChange={e => setEquipPersonalizado(e.target.value)}
+                    style={{
+                      width: '100%', padding: '10px 14px', borderRadius: 10,
+                      border: '2px solid #e5e7eb', fontSize: 14, outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontWeight: 700, fontSize: 13, marginBottom: 8, color: 'var(--cor-texto, #111)' }}>
+                    Cód. Equipamento
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: EQ-001"
+                    value={codigoEquipPersonalizado}
+                    onChange={e => setCodigoEquipPersonalizado(e.target.value)}
+                    style={{
+                      width: '100%', padding: '10px 14px', borderRadius: 10,
+                      border: '2px solid #e5e7eb', fontSize: 14, outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontWeight: 700, fontSize: 13, marginBottom: 8, color: 'var(--cor-texto, #111)' }}>
+                    Item
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Filtro de ar"
+                    value={itemPersonalizado}
+                    onChange={e => setItemPersonalizado(e.target.value)}
+                    style={{
+                      width: '100%', padding: '10px 14px', borderRadius: 10,
+                      border: '2px solid #e5e7eb', fontSize: 14, outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontWeight: 700, fontSize: 13, marginBottom: 8, color: 'var(--cor-texto, #111)' }}>
+                    Local
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: Sala de máquinas"
+                    value={localPersonalizado}
+                    onChange={e => setLocalPersonalizado(e.target.value)}
+                    style={{
+                      width: '100%', padding: '10px 14px', borderRadius: 10,
+                      border: '2px solid #e5e7eb', fontSize: 14, outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontWeight: 700, fontSize: 13, marginBottom: 8, color: 'var(--cor-texto, #111)' }}>
+                    Resp.
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ex: João Silva"
+                    value={responsavelPersonalizado}
+                    onChange={e => setResponsavelPersonalizado(e.target.value)}
+                    style={{
+                      width: '100%', padding: '10px 14px', borderRadius: 10,
+                      border: '2px solid #e5e7eb', fontSize: 14, outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* === ITENS DO CHECKLIST === */}
+              <div style={{ margin: '20px 0 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ flex: 1, height: 2, background: '#f3f4f6' }} />
+                <span style={{ fontWeight: 800, fontSize: 13, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 1, whiteSpace: 'nowrap' }}>Itens do Checklist</span>
+                <div style={{ flex: 1, height: 2, background: '#f3f4f6' }} />
+              </div>
+              {/* Legenda de status */}
+              <div style={{ display: 'flex', gap: 10, marginBottom: 10, fontSize: 11, color: '#9ca3af' }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: '50%', background: '#e5e7eb', display: 'inline-block' }} /> Pendente</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e', display: 'inline-block' }} /> OK</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} /> NOK</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {linhasPersonalizado.map((linha, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: 6, alignItems: 'center', background: linha.status === 'ok' ? '#f0fdf4' : linha.status === 'nok' ? '#fef2f2' : '#fff', borderRadius: 10, padding: '4px 4px 4px 0', border: `2px solid ${linha.status === 'ok' ? '#86efac' : linha.status === 'nok' ? '#fca5a5' : '#e5e7eb'}` }}>
+                    {/* Botões status */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, paddingLeft: 6 }}>
+                      <button onClick={() => { const n=[...linhasPersonalizado]; n[idx]={...n[idx], status: linha.status === 'ok' ? 'pendente' : 'ok'}; setLinhasPersonalizado(n); }} title="OK" style={{ width: 22, height: 22, borderRadius: '50%', border: 'none', background: linha.status === 'ok' ? '#22c55e' : '#e5e7eb', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+                        <Check size={12} style={{ color: linha.status === 'ok' ? '#fff' : '#9ca3af' }} />
+                      </button>
+                      <button onClick={() => { const n=[...linhasPersonalizado]; n[idx]={...n[idx], status: linha.status === 'nok' ? 'pendente' : 'nok'}; setLinhasPersonalizado(n); }} title="NOK" style={{ width: 22, height: 22, borderRadius: '50%', border: 'none', background: linha.status === 'nok' ? '#ef4444' : '#e5e7eb', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+                        <X size={12} style={{ color: linha.status === 'nok' ? '#fff' : '#9ca3af' }} />
+                      </button>
+                    </div>
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', borderRadius: 8, border: '1px solid #e5e7eb', overflow: 'hidden', background: 'transparent' }}>
+                      <input
+                        type="text"
+                        placeholder="Descreva o item..."
+                        value={linha.descricao}
+                        onChange={e => {
+                          const novas = [...linhasPersonalizado];
+                          novas[idx] = { ...novas[idx], descricao: e.target.value };
+                          setLinhasPersonalizado(novas);
+                        }}
+                        style={{ flex: 1, padding: '7px 10px', border: 'none', fontSize: 13, outline: 'none', background: 'transparent' }}
+                      />
+                      <button onClick={() => setModalDetalheIdx(idx)} title="Fotos e observações" style={{ padding: '0 9px', height: '100%', minHeight: 34, border: 'none', borderLeft: '1px solid #e5e7eb', background: (linha.obs || linha.fotos.length > 0) ? '#f0fdf4' : 'transparent', cursor: 'pointer', fontSize: 14, color: (linha.obs || linha.fotos.length > 0) ? '#16a34a' : '#9ca3af', fontWeight: 700, flexShrink: 0 }}>
+                        •••
+                      </button>
+                    </div>
+                    <button title={linha.dataProg ? new Date(linha.dataProg + 'T00:00:00').toLocaleDateString('pt-BR') : 'Dt. Programada'} onClick={() => { setModalData({ idx, tipo: 'prog' }); setModalDataTemp(linha.dataProg); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px', borderRadius: 10, border: '2px solid #e5e7eb', background: linha.dataProg ? '#dbeafe' : '#fff', cursor: 'pointer', width: 36, flexShrink: 0 }}>
+                      <Calendar size={16} style={{ color: linha.dataProg ? '#2563eb' : '#9ca3af' }} />
+                    </button>
+                    <button title={linha.dataConc ? new Date(linha.dataConc + 'T00:00:00').toLocaleDateString('pt-BR') : 'Dt. Concluída'} onClick={() => { setModalData({ idx, tipo: 'conc' }); setModalDataTemp(linha.dataConc); }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '8px', borderRadius: 10, border: '2px solid #e5e7eb', background: linha.dataConc ? '#dcfce7' : '#fff', cursor: 'pointer', width: 36, flexShrink: 0 }}>
+                      <Calendar size={16} style={{ color: linha.dataConc ? '#16a34a' : '#9ca3af' }} />
+                    </button>
+                    {idx === linhasPersonalizado.length - 1 ? (
+                      <button onClick={() => setLinhasPersonalizado([...linhasPersonalizado, { descricao: '', dataProg: '', dataConc: '', obs: '', fotos: [], resp: '', status: 'pendente' }])} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 8, border: '2px solid #2563eb', background: '#eff6ff', cursor: 'pointer', flexShrink: 0 }}>
+                        <Plus size={14} style={{ color: '#2563eb' }} />
+                      </button>
+                    ) : (
+                      <button onClick={() => setLinhasPersonalizado(linhasPersonalizado.filter((_, i) => i !== idx))} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 8, border: '2px solid #fca5a5', background: '#fef2f2', cursor: 'pointer', flexShrink: 0 }}>
+                        <X size={12} style={{ color: '#ef4444' }} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Rodapé */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 20, borderTop: '2px solid #f3f4f6', paddingTop: 16 }}>
+                <button onClick={() => setModalVerTemplates(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, border: '2px solid #e5e7eb', background: '#f9fafb', cursor: 'pointer', fontSize: 13, color: '#374151' }}>
+                  <History size={15} /> Formulários salvos
+                </button>
+                <button onClick={() => setModalHistorico(true)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, border: '2px solid #e5e7eb', background: '#f9fafb', cursor: 'pointer', fontSize: 13, color: '#374151' }}>
+                  <BarChart3 size={15} /> Histórico
+                </button>
+                {/* Imprimir */}
+                <button title="Imprimir formulário" onClick={() => {
+                  const statusLabel = (s: string) => s === 'ok' ? '✓ OK' : s === 'nok' ? '✗ NOK' : '— Pendente';
+                  const linhasHtml = linhasPersonalizado.map((l, i) => `
+                    <tr>
+                      <td style="padding:7px;border:1px solid #e5e7eb;">${i+1}</td>
+                      <td style="padding:7px;border:1px solid #e5e7eb;">${l.descricao || '—'}</td>
+                      <td style="padding:7px;border:1px solid #e5e7eb;text-align:center;">${statusLabel(l.status)}</td>
+                      <td style="padding:7px;border:1px solid #e5e7eb;text-align:center;">${l.dataProg ? new Date(l.dataProg+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
+                      <td style="padding:7px;border:1px solid #e5e7eb;text-align:center;">${l.dataConc ? new Date(l.dataConc+'T00:00:00').toLocaleDateString('pt-BR') : '—'}</td>
+                      <td style="padding:7px;border:1px solid #e5e7eb;">${l.resp || '—'}</td>
+                      <td style="padding:7px;border:1px solid #e5e7eb;">${l.obs || '—'}</td>
+                    </tr>`).join('');
+                  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${tituloPersonalizado || 'Checklist'}</title><style>body{font-family:Arial,sans-serif;padding:32px;color:#111}h1{font-size:20px;margin-bottom:4px}table{width:100%;border-collapse:collapse;margin-top:20px}th{background:#f3f4f6;padding:7px;border:1px solid #e5e7eb;font-size:12px}td{font-size:12px}@media print{@page{margin:20mm}}</style></head><body>
+                    <h1>${tituloPersonalizado || 'Checklist Personalizado'}</h1>
+                    <p style="margin:2px 0;font-size:12px;color:#6b7280">Equipamento: <b>${equipPersonalizado||'—'}</b> &nbsp;|&nbsp; Cód.: <b>${codigoEquipPersonalizado||'—'}</b> &nbsp;|&nbsp; Local: <b>${localPersonalizado||'—'}</b> &nbsp;|&nbsp; Resp.: <b>${responsavelPersonalizado||'—'}</b></p>
+                    <table><thead><tr><th>#</th><th>Item</th><th>Status</th><th>Dt. Prog.</th><th>Dt. Conc.</th><th>Responsável</th><th>Observações</th></tr></thead><tbody>${linhasHtml}</tbody></table>
+                  </body></html>`;
+                  const w = window.open('', '_blank'); if(w){w.document.write(html);w.document.close();w.print();}
+                }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 10, border: '2px solid #e5e7eb', background: '#f9fafb', cursor: 'pointer' }}>
+                  <Printer size={16} style={{ color: '#374151' }} />
+                </button>
+                {/* Compartilhar via QR */}
+                <button title="QR Code / link do formulário" onClick={() => {
+                  const dados = {
+                    titulo: tituloPersonalizado, equip: equipPersonalizado, codigoEquip: codigoEquipPersonalizado,
+                    item: itemPersonalizado, local: localPersonalizado, responsavel: responsavelPersonalizado,
+                    linhas: linhasPersonalizado.map(l => ({ ...l, fotos: [] })),
+                  };
+                  const encoded = btoa(encodeURIComponent(JSON.stringify(dados)));
+                  const url = `${window.location.origin}${window.location.pathname}?checklist_personalizado=${encoded}`;
+                  setModalQRShare(url);
+                }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: 10, border: '2px solid #e5e7eb', background: '#f9fafb', cursor: 'pointer' }}>
+                  <Share2 size={16} style={{ color: '#374151' }} />
+                </button>
+                {/* Registrar checagem */}
+                <button
+                  disabled={!tituloPersonalizado.trim()}
+                  onClick={() => {
+                    const exec: ChecagemRegistrada = {
+                      id: gerarId(),
+                      titulo: tituloPersonalizado.trim(),
+                      equip: equipPersonalizado,
+                      codigoEquip: codigoEquipPersonalizado,
+                      local: localPersonalizado,
+                      responsavel: responsavelPersonalizado,
+                      linhas: linhasPersonalizado.map(l => ({ descricao: l.descricao, dataProg: l.dataProg, dataConc: l.dataConc, obs: l.obs, resp: l.resp, status: l.status })),
+                      registradoEm: new Date().toISOString(),
+                    };
+                    const lista = [exec, ...checagens];
+                    setChecagens(lista);
+                    salvarChecagens(lista);
+                    alert('Checagem registrada no histórico!');
+                  }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 10, border: 'none', background: tituloPersonalizado.trim() ? '#059669' : '#d1d5db', color: '#fff', cursor: tituloPersonalizado.trim() ? 'pointer' : 'not-allowed', fontSize: 13, fontWeight: 700 }}
+                >
+                  <PlayCircle size={15} /> Registrar
+                </button>
+                <button
+                  disabled={!tituloPersonalizado.trim()}
+                  onClick={() => {
+                    const novo: TemplatePersonalizado = {
+                      id: gerarId(),
+                      titulo: tituloPersonalizado.trim(),
+                      equip: equipPersonalizado,
+                      codigoEquip: codigoEquipPersonalizado,
+                      item: itemPersonalizado,
+                      local: localPersonalizado,
+                      responsavel: responsavelPersonalizado,
+                      linhas: linhasPersonalizado,
+                      criadoEm: new Date().toISOString(),
+                    };
+                    const lista = [...templates, novo];
+                    setTemplates(lista);
+                    salvarTemplates(lista);
+                    alert(`Formulário "${novo.titulo}" salvo com sucesso!`);
+                  }}
+                  style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 10, border: 'none', background: tituloPersonalizado.trim() ? '#2563eb' : '#d1d5db', color: '#fff', cursor: tituloPersonalizado.trim() ? 'pointer' : 'not-allowed', fontSize: 13, fontWeight: 700 }}
+                >
+                  <Check size={15} /> Salvar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: formulários salvos */}
+      {modalVerTemplates && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10001, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setModalVerTemplates(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, padding: '24px 28px', width: '90%', maxWidth: 480, boxShadow: '0 16px 60px rgba(0,0,0,0.3)', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <History size={20} style={{ color: '#6b7280' }} />
+              <span style={{ fontWeight: 800, fontSize: 16 }}>Formulários salvos</span>
+              <button onClick={() => setModalVerTemplates(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
+            </div>
+            {templates.length === 0 ? (
+              <p style={{ color: '#9ca3af', fontSize: 14, textAlign: 'center', margin: '24px 0' }}>Nenhum formulário salvo ainda.</p>
+            ) : (
+              <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {templates.map(t => (
+                  <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 12, border: '2px solid #e5e7eb', background: '#f9fafb' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>{t.titulo}</div>
+                      <div style={{ fontSize: 12, color: '#9ca3af' }}>{t.equip && `${t.equip} · `}{t.linhas.length} item(s) · {new Date(t.criadoEm).toLocaleDateString('pt-BR')}</div>
+                    </div>
+                    <button onClick={() => {
+                      setTituloPersonalizado(t.titulo);
+                      setEquipPersonalizado(t.equip);
+                      setCodigoEquipPersonalizado(t.codigoEquip);
+                      setItemPersonalizado(t.item);
+                      setLocalPersonalizado(t.local);
+                      setResponsavelPersonalizado(t.responsavel);
+                      setLinhasPersonalizado(t.linhas.map(l => ({ ...l, dataProg: '', dataConc: '', resp: l.resp || '', status: l.status || 'pendente' as const })));
+                      setModalVerTemplates(false);
+                    }} style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#2563eb', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                      Usar
+                    </button>
+                    <button onClick={() => {
+                      const lista = templates.filter(x => x.id !== t.id);
+                      setTemplates(lista);
+                      salvarTemplates(lista);
+                    }} style={{ padding: '7px 10px', borderRadius: 8, border: '2px solid #fca5a5', background: '#fef2f2', cursor: 'pointer' }}>
+                      <Trash2 size={14} style={{ color: '#ef4444' }} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal detalhes do item: fotos e observações */}
+      {modalDetalheIdx !== null && (() => {
+        const linha = linhasPersonalizado[modalDetalheIdx];
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setModalDetalheIdx(null)}>
+            <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, padding: '24px 28px', width: '90%', maxWidth: 460, boxShadow: '0 16px 60px rgba(0,0,0,0.3)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <FileText size={20} style={{ color: '#6b7280' }} />
+                <span style={{ fontWeight: 800, fontSize: 16 }}>Detalhes do Item</span>
+                <button onClick={() => setModalDetalheIdx(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
+              </div>
+              <p style={{ fontSize: 13, color: '#6b7280', margin: '0 0 12px' }}>Item <strong>{linha.descricao || `#${modalDetalheIdx + 1}`}</strong></p>
+              <label style={{ display: 'block', fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Responsável pelo item</label>
+              <input
+                type="text"
+                placeholder="Nome do responsável (opcional)"
+                value={linha.resp}
+                onChange={e => {
+                  const novas = [...linhasPersonalizado];
+                  novas[modalDetalheIdx] = { ...novas[modalDetalheIdx], resp: e.target.value };
+                  setLinhasPersonalizado(novas);
+                }}
+                style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: '2px solid #e5e7eb', fontSize: 14, outline: 'none', boxSizing: 'border-box', marginBottom: 14 }}
+              />
+              <label style={{ display: 'block', fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Observações</label>
+              <textarea
+                rows={4}
+                placeholder="Anotações, pontos de atenção, procedimentos..."
+                value={linha.obs}
+                onChange={e => {
+                  const novas = [...linhasPersonalizado];
+                  novas[modalDetalheIdx] = { ...novas[modalDetalheIdx], obs: e.target.value };
+                  setLinhasPersonalizado(novas);
+                }}
+                style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '2px solid #e5e7eb', fontSize: 14, outline: 'none', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', marginBottom: 16 }}
+              />
+              <label style={{ display: 'block', fontWeight: 700, fontSize: 13, marginBottom: 6 }}>Fotos</label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 14px', borderRadius: 10, border: '2px dashed #d1d5db', cursor: 'pointer', color: '#6b7280', fontSize: 14, marginBottom: 10 }}>
+                <Plus size={16} /> Adicionar foto
+                <input type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => {
+                  const files = Array.from(e.target.files || []);
+                  const readers = files.map(f => new Promise<string>(res => { const r = new FileReader(); r.onload = () => res(r.result as string); r.readAsDataURL(f); }));
+                  Promise.all(readers).then(urls => {
+                    const novas = [...linhasPersonalizado];
+                    novas[modalDetalheIdx] = { ...novas[modalDetalheIdx], fotos: [...novas[modalDetalheIdx].fotos, ...urls] };
+                    setLinhasPersonalizado(novas);
+                  });
+                  e.target.value = '';
+                }} />
+              </label>
+              {linha.fotos.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
+                  {linha.fotos.map((url, fi) => (
+                    <div key={fi} style={{ position: 'relative' }}>
+                      <img src={url} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 8, border: '2px solid #e5e7eb' }} />
+                      <button onClick={() => {
+                        const novas = [...linhasPersonalizado];
+                        novas[modalDetalheIdx] = { ...novas[modalDetalheIdx], fotos: novas[modalDetalheIdx].fotos.filter((_, i) => i !== fi) };
+                        setLinhasPersonalizado(novas);
+                      }} style={{ position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: '50%', border: 'none', background: '#ef4444', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+                        <X size={11} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button onClick={() => setModalDetalheIdx(null)} style={{ width: '100%', padding: '11px', borderRadius: 10, border: 'none', background: '#111', color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>
+                Concluir
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Mini-modal seleção de data */}
+      {modalData !== null && (() => {
+        const partes = modalDataTemp ? modalDataTemp.split('-') : ['', '', ''];
+        const ano = partes[0] || ''; const mes = partes[1] || ''; const dia = partes[2] || '';
+        const setDia = (d: string) => setModalDataTemp(`${ano || new Date().getFullYear()}-${mes || '01'}-${d.padStart(2,'0')}`);
+        const setMes = (m: string) => setModalDataTemp(`${ano || new Date().getFullYear()}-${m.padStart(2,'0')}-${dia || '01'}`);
+        const setAno = (a: string) => setModalDataTemp(`${a}-${mes || '01'}-${dia || '01'}`);
+        const cor = modalData.tipo === 'prog' ? '#2563eb' : '#16a34a';
+        const inputStyle: React.CSSProperties = { flex: 1, padding: '10px 8px', borderRadius: 10, border: '2px solid #e5e7eb', fontSize: 16, outline: 'none', textAlign: 'center', boxSizing: 'border-box' };
+        return (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setModalData(null)}>
+            <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, padding: '24px 28px', minWidth: 300, boxShadow: '0 16px 60px rgba(0,0,0,0.3)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <Calendar size={20} style={{ color: cor }} />
+                <span style={{ fontWeight: 800, fontSize: 16 }}>
+                  {modalData.tipo === 'prog' ? 'Data Programada' : 'Data Concluída'}
+                </span>
+              </div>
+              <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 16, marginTop: 0 }}>
+                {modalData.tipo === 'prog' ? 'Data prevista para execução do item.' : 'Data em que o item foi concluído.'}
+              </p>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+                <div style={{ flex: 1, textAlign: 'center', fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>DIA</div>
+                <div style={{ flex: 1, textAlign: 'center', fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>MÊS</div>
+                <div style={{ flex: '1.5', textAlign: 'center', fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>ANO</div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <input type="number" min={1} max={31} placeholder="DD" value={dia} onChange={e => setDia(e.target.value.slice(-2).padStart(2,'0') || e.target.value)} style={inputStyle} />
+                <input type="number" min={1} max={12} placeholder="MM" value={mes} onChange={e => setMes(e.target.value.slice(-2).padStart(2,'0') || e.target.value)} style={inputStyle} />
+                <input type="number" min={2000} max={2100} placeholder="AAAA" value={ano} onChange={e => setAno(e.target.value)} style={{ ...inputStyle, flex: 1.5 }} />
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 20 }}>
+                <button onClick={() => setModalData(null)} style={{ flex: 1, padding: '10px', borderRadius: 10, border: '2px solid #e5e7eb', background: '#f9fafb', cursor: 'pointer', fontSize: 14 }}>
+                  Cancelar
+                </button>
+                <button onClick={() => {
+                  const novas = [...linhasPersonalizado];
+                  if (modalData.tipo === 'prog') novas[modalData.idx] = { ...novas[modalData.idx], dataProg: modalDataTemp };
+                  else novas[modalData.idx] = { ...novas[modalData.idx], dataConc: modalDataTemp };
+                  setLinhasPersonalizado(novas);
+                  setModalData(null);
+                }} style={{ flex: 1, padding: '10px', borderRadius: 10, border: 'none', background: cor, color: '#fff', cursor: 'pointer', fontSize: 14, fontWeight: 700 }}>
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Modal QR Code compartilhar */}
+      {modalQRShare && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10002, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setModalQRShare(null)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, padding: '28px 32px', width: '90%', maxWidth: 360, boxShadow: '0 16px 60px rgba(0,0,0,0.3)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+              <span style={{ fontWeight: 800, fontSize: 16 }}>Compartilhar formulário</span>
+              <button onClick={() => setModalQRShare(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
+            </div>
+            <QRCodeCanvas value={modalQRShare} size={200} level="M" />
+            <p style={{ fontSize: 12, color: '#9ca3af', textAlign: 'center', margin: 0 }}>Escaneie para abrir o formulário em outro dispositivo</p>
+            <button onClick={() => navigator.clipboard.writeText(modalQRShare).then(() => alert('Link copiado!')).catch(() => alert(modalQRShare))} style={{ width: '100%', padding: '10px', borderRadius: 10, border: '2px solid #e5e7eb', background: '#f9fafb', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#374151', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <Share2 size={14} /> Copiar link
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal histórico de checagens */}
+      {modalHistorico && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 10002, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={() => setModalHistorico(false)}>
+          <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, padding: '24px 28px', width: '94%', maxWidth: 560, boxShadow: '0 16px 60px rgba(0,0,0,0.3)', maxHeight: '80vh', display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+              <BarChart3 size={20} style={{ color: '#6b7280' }} />
+              <span style={{ fontWeight: 800, fontSize: 16 }}>Histórico de Checagens</span>
+              <button onClick={() => setModalHistorico(false)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}><X size={18} /></button>
+            </div>
+            {checagens.length === 0 ? (
+              <p style={{ color: '#9ca3af', fontSize: 14, textAlign: 'center', margin: '24px 0' }}>Nenhuma checagem registrada ainda.</p>
+            ) : (
+              <div style={{ overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {checagens.map(c => {
+                  const ok = c.linhas.filter(l => l.status === 'ok').length;
+                  const nok = c.linhas.filter(l => l.status === 'nok').length;
+                  const total = c.linhas.length;
+                  return (
+                    <div key={c.id} style={{ padding: '12px 14px', borderRadius: 12, border: '2px solid #e5e7eb', background: '#f9fafb' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 14 }}>{c.titulo}</div>
+                          <div style={{ fontSize: 12, color: '#9ca3af' }}>{c.equip && `${c.equip} · `}{new Date(c.registradoEm).toLocaleString('pt-BR')}</div>
+                        </div>
+                        <button onClick={() => { const lista = checagens.filter(x => x.id !== c.id); setChecagens(lista); salvarChecagens(lista); }} style={{ padding: '5px 8px', borderRadius: 8, border: '2px solid #fca5a5', background: '#fef2f2', cursor: 'pointer' }}>
+                          <Trash2 size={13} style={{ color: '#ef4444' }} />
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, fontSize: 12 }}>
+                        <span style={{ padding: '3px 10px', borderRadius: 20, background: '#dcfce7', color: '#15803d', fontWeight: 700 }}>✓ OK: {ok}</span>
+                        <span style={{ padding: '3px 10px', borderRadius: 20, background: '#fee2e2', color: '#dc2626', fontWeight: 700 }}>✗ NOK: {nok}</span>
+                        <span style={{ padding: '3px 10px', borderRadius: 20, background: '#f3f4f6', color: '#6b7280', fontWeight: 700 }}>— Pend: {total - ok - nok}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal texto do Checklist */}
+      {modalTextoChecklist && (
+        <div className={styles.pvOverlay} style={{ zIndex: 9000 }} onClick={() => setModalTextoChecklist(false)}>
+          <div className={styles.pvModal} onClick={e => e.stopPropagation()} style={{ maxWidth: 520 }}>
+            <div className={styles.pvHeader}>
+              <div className={styles.pvHeaderTopo}>
+                <FileText size={20} style={{ flexShrink: 0 }} />
+                <span style={{ fontWeight: 900, fontSize: 16 }}>Descrição do Checklist</span>
+                <button
+                  onClick={() => setModalTextoChecklist(false)}
+                  style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+            <div style={{ padding: '20px 20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <textarea
+                rows={8}
+                placeholder="Descreva os itens, procedimentos ou observações do checklist..."
+                value={checklistPersonalizado}
+                onChange={e => setChecklistPersonalizado(e.target.value)}
+                autoFocus
+                style={{
+                  width: '100%', padding: '12px 14px', borderRadius: 10,
+                  border: '2px solid #e5e7eb', fontSize: 14, outline: 'none',
+                  boxSizing: 'border-box', resize: 'vertical', lineHeight: 1.6,
+                }}
+              />
+              <button
+                onClick={() => setModalTextoChecklist(false)}
+                style={{
+                  alignSelf: 'flex-end', padding: '10px 24px', borderRadius: 10,
+                  background: '#FFD600', border: 'none', fontWeight: 800, fontSize: 14,
+                  cursor: 'pointer',
+                }}
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

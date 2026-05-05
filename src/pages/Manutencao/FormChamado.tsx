@@ -234,6 +234,14 @@ const ConfigDropdown: React.FC<{
               <div style={{ flex:1, fontSize:11, fontWeight:600, color:'#374151' }}>
                 {campos.map(c => item[c.key]).filter(Boolean).join(' · ')}
               </div>
+              <button type="button" onClick={e => { e.stopPropagation();
+                const novoValor = prompt('Editar ' + campos[0].label + ':', item[campos[0].key]);
+                if (!novoValor || !novoValor.trim() || novoValor.trim() === item[campos[0].key]) return;
+                const updated = lista.map((it, i) => i === idx ? { ...it, [campos[0].key]: novoValor.trim() } : it);
+                localStorage.setItem(lsKey, JSON.stringify(updated));
+                setLista(updated);
+              }}
+                style={{ background:'#dbeafe', border:'none', borderRadius:4, color:'#1d4ed8', fontSize:10, fontWeight:900, cursor:'pointer', padding:'2px 6px' }}>✏️</button>
               <button type="button" onClick={e => { e.stopPropagation(); remover(idx); }}
                 style={{ background:'#fee2e2', border:'none', borderRadius:4, color:'#dc2626', fontSize:10, fontWeight:900, cursor:'pointer', padding:'2px 6px' }}>✕</button>
             </div>
@@ -387,7 +395,7 @@ const BlocoEdicaoImagem: React.FC<{
         <div className={styles.galeriaArea} style={{ position:'relative' }}>
           <Camera size={36} />
           <span>Tire uma foto para marcar detalhes</span>
-          <input type="file" accept="image/*" capture="environment" className={styles.galeriaInput} onChange={handleFotoEdicao} />
+          <input type="file" accept="image/*" className={styles.galeriaInput} onChange={handleFotoEdicao} />
         </div>
       )}
       {editandoImg && fotoOriginal && (
@@ -1154,7 +1162,7 @@ const FormChamado: React.FC<Props> = ({
                   <>
                     <Camera size={28} />
                     <span>📷 Antes</span>
-                    <input type="file" accept="image/*" capture="environment" className={styles.galeriaInput} onChange={handleAD('antes')} />
+                    <input type="file" accept="image/*" className={styles.galeriaInput} onChange={handleAD('antes')} />
                   </>
                 )}
                 <span style={{ fontSize:12, fontWeight:800, color:'#dc2626', textAlign:'center' }}>ANTES</span>
@@ -1169,7 +1177,7 @@ const FormChamado: React.FC<Props> = ({
                   <>
                     <Camera size={28} />
                     <span>📷 Depois</span>
-                    <input type="file" accept="image/*" capture="environment" className={styles.galeriaInput} onChange={handleAD('depois')} />
+                    <input type="file" accept="image/*" className={styles.galeriaInput} onChange={handleAD('depois')} />
                   </>
                 )}
                 <span style={{ fontSize:12, fontWeight:800, color:'#16a34a', textAlign:'center' }}>DEPOIS</span>
@@ -2163,14 +2171,26 @@ const FormChamado: React.FC<Props> = ({
                             </select>
                           </div>
                           {os.tipoManutencao && tipos.includes(os.tipoManutencao) && (
-                            <button type="button" title="Excluir tipo cadastrado" onClick={() => {
-                              if (!confirm('Excluir "' + os.tipoManutencao + '" da lista de tipos?')) return;
-                              let current: string[] = [];
-                              try { current = JSON.parse(localStorage.getItem(LS_TIPOS_MANUT) || '[]'); } catch { /* ok */ }
-                              const updated = current.filter(t => t !== os.tipoManutencao);
-                              localStorage.setItem(LS_TIPOS_MANUT, JSON.stringify(updated));
-                              setResposta(bloco.uid, { ...os, tipoManutencao: '' });
-                            }} style={{ height:36, width:36, background:'#fee2e2', border:'1.5px solid #fca5a5', borderRadius:8, color:'#dc2626', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>🗑️</button>
+                            <>
+                              <button type="button" title="Editar tipo cadastrado" onClick={() => {
+                                const novoNome = prompt('Editar nome do tipo:', os.tipoManutencao);
+                                if (!novoNome || !novoNome.trim() || novoNome.trim() === os.tipoManutencao) return;
+                                if (tipos.includes(novoNome.trim())) { alert('Tipo "' + novoNome.trim() + '" já existe!'); return; }
+                                let current: string[] = [];
+                                try { current = JSON.parse(localStorage.getItem(LS_TIPOS_MANUT) || '[]'); } catch { /* ok */ }
+                                const updated = current.map(t => t === os.tipoManutencao ? novoNome.trim() : t);
+                                localStorage.setItem(LS_TIPOS_MANUT, JSON.stringify(updated));
+                                setResposta(bloco.uid, { ...os, tipoManutencao: novoNome.trim() });
+                              }} style={{ height:36, width:36, background:'#dbeafe', border:'1.5px solid #93c5fd', borderRadius:8, color:'#1d4ed8', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>✏️</button>
+                              <button type="button" title="Excluir tipo cadastrado" onClick={() => {
+                                if (!confirm('Excluir "' + os.tipoManutencao + '" da lista de tipos?')) return;
+                                let current: string[] = [];
+                                try { current = JSON.parse(localStorage.getItem(LS_TIPOS_MANUT) || '[]'); } catch { /* ok */ }
+                                const updated = current.filter(t => t !== os.tipoManutencao);
+                                localStorage.setItem(LS_TIPOS_MANUT, JSON.stringify(updated));
+                                setResposta(bloco.uid, { ...os, tipoManutencao: '' });
+                              }} style={{ height:36, width:36, background:'#fee2e2', border:'1.5px solid #fca5a5', borderRadius:8, color:'#dc2626', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>🗑️</button>
+                            </>
                           )}
                         </div>
                         <div style={{ marginTop:8 }}>{fieldLbl('Nome do Tipo')}<input className={styles.campoInput} placeholder="Ex: Preventiva, Corretiva, Preditiva..." value={os.tipoManutencao || ''} onChange={e => updateOS('tipoManutencao', e.target.value)} /></div>
@@ -2248,6 +2268,20 @@ const FormChamado: React.FC<Props> = ({
                     const aba = os._maqModalAba || 'selecionar';
                     const fecharModal = () => setResposta(bloco.uid, { ...os, _maqModalAberto: false, _buscaMaquina: '' });
 
+                    // ── Filtro computado fora do JSX para evitar problemas de closure ──
+                    const qBusca = (os._buscaMaquina || '').toLowerCase().trim();
+                    const maqsFiltradas = qBusca
+                      ? maqs.filter(m =>
+                          m.nome.toLowerCase().includes(qBusca) ||
+                          m.codigo.toLowerCase().includes(qBusca) ||
+                          m.numero.includes(qBusca) ||
+                          (m.setor || '').toLowerCase().includes(qBusca) ||
+                          (m.modelo || '').toLowerCase().includes(qBusca) ||
+                          (m.marca || '').toLowerCase().includes(qBusca) ||
+                          (m.localizacao || '').toLowerCase().includes(qBusca)
+                        )
+                      : maqs;
+
                     return (
                       <div style={{ position:'fixed', inset:0, zIndex:10000, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', padding:16 }}
                         onClick={fecharModal}>
@@ -2283,9 +2317,12 @@ const FormChamado: React.FC<Props> = ({
                                 <div style={{ position:'relative', marginBottom:12 }}>
                                   <input
                                     className={styles.campoInput}
-                                    placeholder="🔍 Buscar por nome, código ou Nº..."
+                                    placeholder="🔍 Buscar por nome, código, Nº ou setor..."
                                     value={os._buscaMaquina ?? ''}
-                                    onChange={e => setResposta(bloco.uid, { ...os, _buscaMaquina: e.target.value })}
+                                    onChange={e => {
+                                      const novoVal = e.target.value;
+                                      setResposta(bloco.uid, { ...os, _buscaMaquina: novoVal });
+                                    }}
                                     autoFocus
                                     style={{ fontWeight:700, fontSize:14, padding:'12px 40px 12px 14px' }}
                                   />
@@ -2305,58 +2342,75 @@ const FormChamado: React.FC<Props> = ({
                                       ➕ Cadastrar Agora
                                     </button>
                                   </div>
-                                ) : (() => {
-                                  const q = (os._buscaMaquina || '').toLowerCase().trim();
-                                  const filtradas = q
-                                    ? maqs.filter(m => m.nome.toLowerCase().includes(q) || m.codigo.toLowerCase().includes(q) || m.numero.includes(q) || (m.setor || '').toLowerCase().includes(q))
-                                    : maqs;
-                                  return (
-                                    <>
-                                      <div style={{ fontSize:11, fontWeight:800, color:'#6b7280', marginBottom:8 }}>
-                                        {q ? `${filtradas.length} resultado${filtradas.length !== 1 ? 's' : ''}` : `${maqs.length} máquina${maqs.length !== 1 ? 's' : ''}`}
+                                ) : (
+                                  <>
+                                    <div style={{ fontSize:11, fontWeight:800, color:'#6b7280', marginBottom:8 }}>
+                                      {qBusca ? `${maqsFiltradas.length} resultado${maqsFiltradas.length !== 1 ? 's' : ''}` : `${maqs.length} máquina${maqs.length !== 1 ? 's' : ''}`}
+                                    </div>
+                                    {maqsFiltradas.length === 0 ? (
+                                      <div style={{ textAlign:'center', padding:'24px 16px', color:'#9ca3af', fontSize:13 }}>
+                                        Nenhuma máquina encontrada para &quot;{os._buscaMaquina}&quot;
                                       </div>
-                                      {filtradas.length === 0 ? (
-                                        <div style={{ textAlign:'center', padding:'24px 16px', color:'#9ca3af', fontSize:13 }}>
-                                          Nenhuma máquina encontrada para &quot;{os._buscaMaquina}&quot;
-                                        </div>
-                                      ) : (
-                                        <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                                          {filtradas.map(m => {
-                                            const selecionada = os.maquinaNumero === m.numero;
-                                            return (
-                                              <div key={m.numero}
-                                                onClick={() => {
-                                                  setResposta(bloco.uid, { ...os, maquinaNome: m.nome, maquinaCodigo: m.codigo, maquinaNumero: m.numero, maquinaSetor: m.setor || '', maquinaModelo: m.modelo || '', maquinaMarca: m.marca || '', maquinaLocalizacao: m.localizacao || '', _maqModalAberto: false, _buscaMaquina: '' });
-                                                }}
-                                                style={{
-                                                  padding:'12px 14px', cursor:'pointer', borderRadius:12,
-                                                  border: selecionada ? '2px solid #3b82f6' : '1.5px solid #e5e7eb',
-                                                  background: selecionada ? '#eff6ff' : '#f9fafb',
-                                                  transition:'all 0.15s',
-                                                }}
-                                                onMouseEnter={e => { if (!selecionada) e.currentTarget.style.background = '#fef9c3'; }}
-                                                onMouseLeave={e => { if (!selecionada) e.currentTarget.style.background = '#f9fafb'; }}
-                                              >
-                                                <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-                                                  <span style={{ background:'#fef3c7', color:'#92400e', fontSize:11, fontWeight:900, padding:'2px 8px', borderRadius:6, fontFamily:'monospace', flexShrink:0 }}>Nº {m.numero}</span>
-                                                  <span style={{ fontWeight:800, fontSize:14, color:'#0D0D0D' }}>{m.nome}</span>
-                                                  {selecionada && <span style={{ fontSize:10, fontWeight:900, color:'#3b82f6', background:'#dbeafe', padding:'2px 8px', borderRadius:6, marginLeft:'auto' }}>ATUAL</span>}
-                                                </div>
-                                                <div style={{ display:'flex', flexWrap:'wrap', gap:6, fontSize:11, color:'#6b7280' }}>
+                                    ) : (
+                                      <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+                                        {maqsFiltradas.map(m => {
+                                          const selecionada = os.maquinaNumero === m.numero;
+                                          return (
+                                            <div key={m.numero}
+                                              onClick={() => {
+                                                setResposta(bloco.uid, { ...os, maquinaNome: m.nome, maquinaCodigo: m.codigo, maquinaNumero: m.numero, maquinaSetor: m.setor || '', maquinaModelo: m.modelo || '', maquinaMarca: m.marca || '', maquinaLocalizacao: m.localizacao || '', _maqModalAberto: false, _buscaMaquina: '' });
+                                              }}
+                                              style={{
+                                                padding:'12px 14px', cursor:'pointer', borderRadius:12,
+                                                border: selecionada ? '2px solid #3b82f6' : '1.5px solid #e5e7eb',
+                                                background: selecionada ? '#eff6ff' : '#f9fafb',
+                                                transition:'all 0.15s',
+                                              }}
+                                              onMouseEnter={e => { if (!selecionada) e.currentTarget.style.background = '#fef9c3'; }}
+                                              onMouseLeave={e => { if (!selecionada) e.currentTarget.style.background = '#f9fafb'; }}
+                                            >
+                                              <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
+                                                <span style={{ background:'#fef3c7', color:'#92400e', fontSize:11, fontWeight:900, padding:'2px 8px', borderRadius:6, fontFamily:'monospace', flexShrink:0 }}>Nº {m.numero}</span>
+                                                <span style={{ fontWeight:800, fontSize:14, color:'#0D0D0D' }}>{m.nome}</span>
+                                                {selecionada && <span style={{ fontSize:10, fontWeight:900, color:'#3b82f6', background:'#dbeafe', padding:'2px 8px', borderRadius:6, marginLeft:'auto' }}>ATUAL</span>}
+                                              </div>
+                                              <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                                                <div style={{ display:'flex', flexWrap:'wrap', gap:6, fontSize:11, color:'#6b7280', flex:1 }}>
                                                   {m.codigo && <span style={{ fontFamily:'monospace' }}>Cód: {m.codigo}</span>}
                                                   {m.setor && <span>🏢 {m.setor}</span>}
-                                                  {m.modelo && <span>� {m.modelo}</span>}
+                                                  {m.modelo && <span>📦 {m.modelo}</span>}
                                                   {m.marca && <span>📝 {m.marca}</span>}
                                                   {m.localizacao && <span>📍 {m.localizacao}</span>}
                                                 </div>
+                                                <button type="button" title="Editar" onClick={e => { e.stopPropagation();
+                                                  const novoNome = prompt('Nome:', m.nome);
+                                                  if (!novoNome?.trim()) return;
+                                                  const novoCodigo = prompt('Código:', m.codigo || '');
+                                                  const novoSetor = prompt('Setor:', m.setor || '');
+                                                  const novoLocal = prompt('Localização:', m.localizacao || '');
+                                                  const novoModelo = prompt('Operador:', m.modelo || '');
+                                                  const novoMarca = prompt('Descrição:', m.marca || '');
+                                                  const maqsAtual: CadMaquina[] = JSON.parse(localStorage.getItem(LS_MAQUINAS) || '[]');
+                                                  const updated = maqsAtual.map(x => x.numero === m.numero ? { ...x, nome: novoNome.trim(), codigo: novoCodigo?.trim() || x.codigo, setor: novoSetor?.trim() || x.setor, localizacao: novoLocal?.trim() || x.localizacao, modelo: novoModelo?.trim() || x.modelo, marca: novoMarca?.trim() || x.marca } : x);
+                                                  localStorage.setItem(LS_MAQUINAS, JSON.stringify(updated));
+                                                  setResposta(bloco.uid, { ...os, _maqReload: Date.now() });
+                                                }} style={{ background:'#dbeafe', border:'none', borderRadius:6, color:'#1d4ed8', fontSize:12, fontWeight:900, cursor:'pointer', padding:'4px 8px', flexShrink:0 }}>✏️</button>
+                                                <button type="button" title="Excluir" onClick={e => { e.stopPropagation();
+                                                  if (!confirm(`Excluir máquina "${m.nome}"?`)) return;
+                                                  const maqsAtual: CadMaquina[] = JSON.parse(localStorage.getItem(LS_MAQUINAS) || '[]');
+                                                  const updated = maqsAtual.filter(x => x.numero !== m.numero);
+                                                  localStorage.setItem(LS_MAQUINAS, JSON.stringify(updated));
+                                                  if (os.maquinaNumero === m.numero) setResposta(bloco.uid, { ...os, maquinaNome:'', maquinaCodigo:'', maquinaNumero:'', _maqReload: Date.now() });
+                                                  else setResposta(bloco.uid, { ...os, _maqReload: Date.now() });
+                                                }} style={{ background:'#fee2e2', border:'none', borderRadius:6, color:'#dc2626', fontSize:12, fontWeight:900, cursor:'pointer', padding:'4px 8px', flexShrink:0 }}>🗑️</button>
                                               </div>
-                                            );
-                                          })}
-                                        </div>
-                                      )}
-                                    </>
-                                  );
-                                })()}
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    )}
+                                  </>
+                                )}
                               </>
                             )}
 
@@ -2449,14 +2503,26 @@ const FormChamado: React.FC<Props> = ({
                             </select>
                           </div>
                           {os.tecnicoNome && tecnicos.some(t => t.nome === os.tecnicoNome) && (
-                            <button type="button" title="Excluir técnico cadastrado" onClick={() => {
-                              if (!confirm('Excluir "' + os.tecnicoNome + '" da lista de técnicos?')) return;
-                              let current: CadTecnico[] = [];
-                              try { current = JSON.parse(localStorage.getItem(LS_TECNICOS) || '[]'); } catch { /* ok */ }
-                              const updated = current.filter(t => t.nome !== os.tecnicoNome);
-                              localStorage.setItem(LS_TECNICOS, JSON.stringify(updated));
-                              setResposta(bloco.uid, { ...os, tecnicoNome: '' });
-                            }} style={{ height:36, width:36, background:'#fee2e2', border:'1.5px solid #fca5a5', borderRadius:8, color:'#dc2626', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>🗑️</button>
+                            <>
+                              <button type="button" title="Editar técnico cadastrado" onClick={() => {
+                                const novoNome = prompt('Editar nome do técnico:', os.tecnicoNome);
+                                if (!novoNome || !novoNome.trim() || novoNome.trim() === os.tecnicoNome) return;
+                                if (tecnicos.some(t => t.nome === novoNome.trim())) { alert('Técnico "' + novoNome.trim() + '" já existe!'); return; }
+                                let current: CadTecnico[] = [];
+                                try { current = JSON.parse(localStorage.getItem(LS_TECNICOS) || '[]'); } catch { /* ok */ }
+                                const updated = current.map(t => t.nome === os.tecnicoNome ? { ...t, nome: novoNome.trim() } : t);
+                                localStorage.setItem(LS_TECNICOS, JSON.stringify(updated));
+                                setResposta(bloco.uid, { ...os, tecnicoNome: novoNome.trim() });
+                              }} style={{ height:36, width:36, background:'#dbeafe', border:'1.5px solid #93c5fd', borderRadius:8, color:'#1d4ed8', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>✏️</button>
+                              <button type="button" title="Excluir técnico cadastrado" onClick={() => {
+                                if (!confirm('Excluir "' + os.tecnicoNome + '" da lista de técnicos?')) return;
+                                let current: CadTecnico[] = [];
+                                try { current = JSON.parse(localStorage.getItem(LS_TECNICOS) || '[]'); } catch { /* ok */ }
+                                const updated = current.filter(t => t.nome !== os.tecnicoNome);
+                                localStorage.setItem(LS_TECNICOS, JSON.stringify(updated));
+                                setResposta(bloco.uid, { ...os, tecnicoNome: '' });
+                              }} style={{ height:36, width:36, background:'#fee2e2', border:'1.5px solid #fca5a5', borderRadius:8, color:'#dc2626', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>🗑️</button>
+                            </>
                           )}
                         </div>
                         <div style={{ marginTop:8 }}>{fieldLbl('Nome do Técnico')}<input className={styles.campoInput} placeholder="Nome do técnico responsável..." value={os.tecnicoNome || ''} onChange={e => updateOS('tecnicoNome', e.target.value)} /></div>
@@ -2671,8 +2737,30 @@ const FormChamado: React.FC<Props> = ({
                                                 onMouseLeave={e => { if (!selecionada) e.currentTarget.style.background = '#f9fafb'; }}
                                               >
                                                 <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4 }}>
-                                                  <span style={{ fontWeight:800, fontSize:14, color:'#0D0D0D' }}>{p.nome}</span>
-                                                  {selecionada && <span style={{ fontSize:10, fontWeight:900, color:'#7c3aed', background:'#f3e8ff', padding:'2px 8px', borderRadius:6, marginLeft:'auto' }}>ATUAL</span>}
+                                                  <span style={{ fontWeight:800, fontSize:14, color:'#0D0D0D', flex:1 }}>{p.nome}</span>
+                                                  {selecionada && <span style={{ fontSize:10, fontWeight:900, color:'#7c3aed', background:'#f3e8ff', padding:'2px 8px', borderRadius:6 }}>ATUAL</span>}
+                                                  <button type="button" title="Editar prestadora" onClick={e => {
+                                                    e.stopPropagation();
+                                                    const novoNome = prompt('Editar nome da prestadora:', p.nome);
+                                                    if (!novoNome || !novoNome.trim() || novoNome.trim() === p.nome) return;
+                                                    let current: CadPrestadora[] = [];
+                                                    try { current = JSON.parse(localStorage.getItem(LS_PRESTADORAS) || '[]'); } catch { /* ok */ }
+                                                    if (current.some(x => x.nome.toLowerCase() === novoNome.trim().toLowerCase() && x.nome !== p.nome)) { alert('Prestadora "' + novoNome.trim() + '" já existe!'); return; }
+                                                    const updated = current.map(x => x.nome === p.nome ? { ...x, nome: novoNome.trim() } : x);
+                                                    localStorage.setItem(LS_PRESTADORAS, JSON.stringify(updated));
+                                                    if (os.prestadoraNome === p.nome) { setResposta(bloco.uid, { ...os, prestadoraNome: novoNome.trim() }); }
+                                                    else { setResposta(bloco.uid, { ...os }); }
+                                                  }} style={{ background:'#dbeafe', border:'1.5px solid #93c5fd', borderRadius:6, width:26, height:26, color:'#1d4ed8', fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>✏️</button>
+                                                  <button type="button" title="Excluir prestadora" onClick={e => {
+                                                    e.stopPropagation();
+                                                    if (!confirm('Excluir "' + p.nome + '" da lista de prestadoras?')) return;
+                                                    let current: CadPrestadora[] = [];
+                                                    try { current = JSON.parse(localStorage.getItem(LS_PRESTADORAS) || '[]'); } catch { /* ok */ }
+                                                    const updated = current.filter(x => x.nome !== p.nome);
+                                                    localStorage.setItem(LS_PRESTADORAS, JSON.stringify(updated));
+                                                    if (os.prestadoraNome === p.nome) { setResposta(bloco.uid, { ...os, prestadoraNome:'', prestadoraCnpj:'', prestadoraEmail:'', prestadoraWhatsapp:'' }); }
+                                                    else { setResposta(bloco.uid, { ...os }); }
+                                                  }} style={{ background:'#fee2e2', border:'1.5px solid #fca5a5', borderRadius:6, width:26, height:26, color:'#dc2626', fontSize:12, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>🗑️</button>
                                                 </div>
                                                 <div style={{ display:'flex', flexWrap:'wrap', gap:6, fontSize:11, color:'#6b7280' }}>
                                                   {p.cnpj && <span style={{ fontFamily:'monospace' }}>CNPJ: {p.cnpj}</span>}
@@ -2777,14 +2865,26 @@ const FormChamado: React.FC<Props> = ({
                             </select>
                           </div>
                           {os.gestorNome && gestores.some(g => g.nome === os.gestorNome) && (
-                            <button type="button" title="Excluir gestor cadastrado" onClick={() => {
-                              if (!confirm('Excluir "' + os.gestorNome + '" da lista de gestores?')) return;
-                              let current: CadGestor[] = [];
-                              try { current = JSON.parse(localStorage.getItem(LS_GESTORES) || '[]'); } catch { /* ok */ }
-                              const updated = current.filter(g => g.nome !== os.gestorNome);
-                              localStorage.setItem(LS_GESTORES, JSON.stringify(updated));
-                              setResposta(bloco.uid, { ...os, gestorNome: '', gestorCargo: '' });
-                            }} style={{ height:36, width:36, background:'#fee2e2', border:'1.5px solid #fca5a5', borderRadius:8, color:'#dc2626', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>🗑️</button>
+                            <>
+                              <button type="button" title="Editar gestor cadastrado" onClick={() => {
+                                const novoNome = prompt('Editar nome do gestor:', os.gestorNome);
+                                if (!novoNome || !novoNome.trim() || novoNome.trim() === os.gestorNome) return;
+                                if (gestores.some(g => g.nome === novoNome.trim())) { alert('Gestor "' + novoNome.trim() + '" já existe!'); return; }
+                                let current: CadGestor[] = [];
+                                try { current = JSON.parse(localStorage.getItem(LS_GESTORES) || '[]'); } catch { /* ok */ }
+                                const updated = current.map(g => g.nome === os.gestorNome ? { ...g, nome: novoNome.trim() } : g);
+                                localStorage.setItem(LS_GESTORES, JSON.stringify(updated));
+                                setResposta(bloco.uid, { ...os, gestorNome: novoNome.trim() });
+                              }} style={{ height:36, width:36, background:'#dbeafe', border:'1.5px solid #93c5fd', borderRadius:8, color:'#1d4ed8', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>✏️</button>
+                              <button type="button" title="Excluir gestor cadastrado" onClick={() => {
+                                if (!confirm('Excluir "' + os.gestorNome + '" da lista de gestores?')) return;
+                                let current: CadGestor[] = [];
+                                try { current = JSON.parse(localStorage.getItem(LS_GESTORES) || '[]'); } catch { /* ok */ }
+                                const updated = current.filter(g => g.nome !== os.gestorNome);
+                                localStorage.setItem(LS_GESTORES, JSON.stringify(updated));
+                                setResposta(bloco.uid, { ...os, gestorNome: '', gestorCargo: '' });
+                              }} style={{ height:36, width:36, background:'#fee2e2', border:'1.5px solid #fca5a5', borderRadius:8, color:'#dc2626', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>🗑️</button>
+                            </>
                           )}
                         </div>
                         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:8 }}>

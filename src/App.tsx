@@ -57,7 +57,7 @@ const NavBar: React.FC = () => {
       {/* ── Barra superior ── */}
       <nav className={styles.topBar}>
         <div className={styles.logo}>
-          <img src="/logos/logo.png" alt="Logo" style={{ height: 28, objectFit: 'contain', filter: 'drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000)' }} />
+          <img src="/logos/simples-manutencao.png?v=2" alt="Logo" style={{ height: 28, objectFit: 'contain' }} />
         </div>
 
         {/* Nav desktop */}

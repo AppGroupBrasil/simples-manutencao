@@ -50,6 +50,34 @@ const ChamadoPublicoPage: React.FC = () => {
 
   useEffect(() => {
     if (!protocolo) return;
+
+    // 1) Tentar encontrar no localStorage primeiro (mesmo dispositivo)
+    try {
+      const local = JSON.parse(localStorage.getItem('manutencao_chamados_v2') || '[]');
+      const found = Array.isArray(local) ? local.find((c: any) => c.protocolo === protocolo) : null;
+      if (found) {
+        setChamado({
+          protocolo: found.protocolo,
+          funcaoNome: found.funcaoNome || '',
+          funcaoIcone: found.funcaoIcone || '',
+          funcaoCor: found.funcaoCor || '',
+          status: found.status || 'aberto',
+          responsavel: found.responsavel || '',
+          criadoEm: found.criadoEm || null,
+          horarioInicial: found.horarioInicial || null,
+          horarioFinal: found.horarioFinal || null,
+          tempoTotal: found.tempoTotal || null,
+          osTitulo: found.osTitulo || '',
+          osNumero: found.osNumero || '',
+          observacoes: found.observacoes || '',
+          respostas: found.respostas || {},
+        });
+        setCarregando(false);
+        return;
+      }
+    } catch { /* ok — fallback to API */ }
+
+    // 2) Buscar na API (outro dispositivo)
     fetch(`${API_URL}/chamado/${encodeURIComponent(protocolo)}`)
       .then(r => r.json())
       .then(data => {
@@ -72,7 +100,7 @@ const ChamadoPublicoPage: React.FC = () => {
             <ArrowLeft size={20} color="#6b7280" />
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <img src="/logos/logo.png" alt="" style={{ height: 24, objectFit: 'contain', filter: 'drop-shadow(0 0 1px #000)' }} />
+              <img src="/logos/simples-manutencao.png?v=2" alt="" style={{ height: 24, objectFit: 'contain' }} />
             <span style={{ fontSize: 14, fontWeight: 700, color: '#374151' }}>Simples Manutenção</span>
           </div>
         </div>

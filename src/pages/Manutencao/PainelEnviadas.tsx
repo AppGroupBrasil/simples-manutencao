@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { X, Clock, Filter, Share2, FileDown } from 'lucide-react';
+import { X, Clock, Filter, Share2, FileDown, Eye } from 'lucide-react';
 import { QRCodeCanvas } from 'qrcode.react';
 import type { ChamadoManutencao } from './types';
+import { visualizarChamado } from '../../utils/visualizarChamado';
 import styles from './PainelEnviadas.module.css';
 
 interface Props {
@@ -339,6 +340,13 @@ const PainelEnviadas: React.FC<Props> = ({
 
                     {/* Botões de ação */}
                     <div className={styles.cardAcoes} style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+                      <button
+                        onClick={() => visualizarChamado(c)}
+                        style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', background:'rgba(37,99,235,0.1)', border:'1.5px solid rgba(37,99,235,0.35)', borderRadius:10, color:'#2563eb', cursor:'pointer', fontSize:13, fontWeight:700, fontFamily:'inherit' }}
+                        title="Visualizar chamado"
+                      >
+                        <Eye size={16} /> Visualizar
+                      </button>
                       {onCompartilhar && (
                         <button
                           onClick={() => onCompartilhar(c)}

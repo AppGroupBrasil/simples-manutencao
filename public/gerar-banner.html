@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Gerar Banner Play Store</title>
+  <style>
+    body { margin: 0; background: #1a1a2e; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: sans-serif; gap: 20px; }
+    canvas { border-radius: 8px; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+    button { padding: 14px 32px; background: #4ade80; color: #111; border: none; border-radius: 8px; font-size: 16px; font-weight: 700; cursor: pointer; }
+    button:hover { background: #22c55e; }
+  </style>
+</head>
+<body>
+  <canvas id="banner" width="1024" height="500"></canvas>
+  <button onclick="download()">⬇ Baixar banner.png</button>
+
+  <script>
+    const canvas = document.getElementById('banner');
+    const ctx = canvas.getContext('2d');
+    const W = 1024, H = 500;
+
+    // Fundo gradiente escuro amarelado
+    const bg = ctx.createLinearGradient(0, 0, W, H);
+    bg.addColorStop(0, '#1a1200');
+    bg.addColorStop(0.5, '#2d1f00');
+    bg.addColorStop(1, '#1a1200');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, W, H);
+
+    // Círculos decorativos de fundo
+    ctx.globalAlpha = 0.08;
+    ctx.fillStyle = '#facc15';
+    ctx.beginPath(); ctx.arc(820, 80, 200, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(100, 420, 150, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    // Badge amarelo — "Sistema de Gestão"
+    const badgeX = 80, badgeY = 100;
+    ctx.fillStyle = 'rgba(250,204,21,0.18)';
+    roundRect(ctx, badgeX, badgeY, 230, 36, 18);
+    ctx.fill();
+    ctx.fillStyle = '#fde68a';
+    ctx.font = '600 14px -apple-system, sans-serif';
+    ctx.fillText('● SISTEMA DE GESTÃO', badgeX + 16, badgeY + 24);
+
+    // Título principal
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 58px -apple-system, sans-serif';
+    ctx.fillText('Simples', 80, 210);
+
+    const grad2 = ctx.createLinearGradient(80, 220, 500, 280);
+    grad2.addColorStop(0, '#facc15');
+    grad2.addColorStop(1, '#fb923c');
+    ctx.fillStyle = grad2;
+    ctx.font = 'bold 58px -apple-system, sans-serif';
+    ctx.fillText('Manutenção', 80, 275);
+
+    // Subtítulo
+    ctx.fillStyle = '#a3856b';
+    ctx.font = '22px -apple-system, sans-serif';
+    ctx.fillText('Gestão de chamados para condomínios e empresas', 80, 325);
+
+    // Features — ícones + texto
+    const features = [
+      '✓  Chamados em tempo real',
+      '✓  Ordens de serviço',
+      '✓  Acesso por QR Code',
+    ];
+    ctx.fillStyle = '#fef3c7';
+    ctx.font = '17px -apple-system, sans-serif';
+    features.forEach((f, i) => {
+      ctx.fillText(f, 80, 380 + i * 30);
+    });
+
+    // Painel direito — mockup de card
+    const cardX = 640, cardY = 80, cardW = 300, cardH = 340;
+    ctx.fillStyle = 'rgba(255,255,255,0.05)';
+    roundRect(ctx, cardX, cardY, cardW, cardH, 16);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(250,204,21,0.35)';
+    ctx.lineWidth = 1;
+    roundRect(ctx, cardX, cardY, cardW, cardH, 16);
+    ctx.stroke();
+
+    // Título do card
+    ctx.fillStyle = '#fef9c3';
+    ctx.font = 'bold 16px -apple-system, sans-serif';
+    ctx.fillText('Chamado #1042', cardX + 20, cardY + 40);
+
+    // Status badge
+    ctx.fillStyle = 'rgba(250,204,21,0.2)';
+    roundRect(ctx, cardX + 20, cardY + 52, 100, 24, 12);
+    ctx.fill();
+    ctx.fillStyle = '#facc15';
+    ctx.font = '12px -apple-system, sans-serif';
+    ctx.fillText('● Concluído', cardX + 30, cardY + 68);
+
+    // Linhas de info
+    const infos = [
+      ['Tipo', 'Elétrica'],
+      ['Local', 'Bloco A - Apt 102'],
+      ['Responsável', 'Carlos Silva'],
+      ['Data', '10/04/2026'],
+    ];
+    ctx.font = '14px -apple-system, sans-serif';
+    infos.forEach(([label, val], i) => {
+      const y = cardY + 115 + i * 44;
+      ctx.fillStyle = '#78604a';
+      ctx.fillText(label, cardX + 20, y);
+      ctx.fillStyle = '#fef3c7';
+      ctx.fillText(val, cardX + 20, y + 20);
+      ctx.fillStyle = 'rgba(255,255,255,0.06)';
+      ctx.fillRect(cardX + 16, y + 28, cardW - 32, 1);
+    });
+
+    // Linha inferior amarela → laranja
+    const lineGrad = ctx.createLinearGradient(0, H - 4, W, H);
+    lineGrad.addColorStop(0, '#facc15');
+    lineGrad.addColorStop(1, '#fb923c');
+    ctx.fillStyle = lineGrad;
+    ctx.fillRect(0, H - 4, W, 4);
+
+    function roundRect(ctx, x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + w - r, y);
+      ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+      ctx.lineTo(x + w, y + h - r);
+      ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+      ctx.lineTo(x + r, y + h);
+      ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    function download() {
+      const link = document.createElement('a');
+      link.download = 'banner-play-store-1024x500.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+  </script>
+</body>
+</html>

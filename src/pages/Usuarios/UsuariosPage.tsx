@@ -4,7 +4,7 @@ import { useAuth, gerarLogin } from '../../contexts/AuthContext';
 import { usePin, PinModal } from '../../components/PinProtecao';
 import styles from './Usuarios.module.css';
 
-const CARGOS = ['Mecânico', 'Operador', 'Eletricista', 'Encanador', 'Pintor', 'Porteiro', 'Zelador', 'Técnico', 'Auxiliar', 'Outro'];
+const CARGOS = ['Analista', 'Mecânico', 'Operador', 'Eletricista', 'Encanador', 'Pintor', 'Porteiro', 'Zelador', 'Técnico', 'Auxiliar', 'Outro'];
 
 const UsuariosPage: React.FC = () => {
   const { listarFuncionarios, criarFuncionario, excluirFuncionario, usuario } = useAuth();
@@ -12,7 +12,7 @@ const UsuariosPage: React.FC = () => {
 
   const [mostrarForm, setMostrarForm] = useState(false);
   const [nome, setNome]   = useState('');
-  const [cargo, setCargo] = useState('Mecânico');
+  const [cargo, setCargo] = useState('Analista');
   const [senha, setSenha] = useState('');
   const [erros, setErros] = useState<Record<string, string>>({});
   const [criado, setCriado] = useState<{ login: string; senha: string } | null>(null);
@@ -33,7 +33,7 @@ const UsuariosPage: React.FC = () => {
     if (Object.keys(e).length > 0) { setErros(e); return; }
     const result = criarFuncionario({ nome: nome.trim(), cargo, senha, adminId: usuario?.adminId });
     setCriado({ login: result.login, senha });
-    setNome(''); setCargo('Mecânico'); setSenha(''); setErros({});
+    setNome(''); setCargo('Analista'); setSenha(''); setErros({});
     setMostrarForm(false);
   };
 

@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useRef } from 'react';
-import { Search, X, Clock, AlertCircle, Filter, Inbox, FileDown, BarChart3, Hash, ClipboardList, Calendar } from 'lucide-react';
+import { Search, X, Clock, AlertCircle, Filter, Inbox, FileDown, BarChart3, Hash, ClipboardList, Calendar, Eye } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { useAuth } from '../../contexts/AuthContext';
 import type { ChamadoManutencao } from '../Manutencao/types';
+import { visualizarChamado } from '../../utils/visualizarChamado';
 import styles from './MeusChamados.module.css';
 
 // ── Carrega chamados do localStorage ─────────────────────────────────────
@@ -103,8 +104,33 @@ function imprimirChamado(c: ChamadoManutencao) {
     return respostasHtml;
   })()}
 
+  <div style="text-align:center;margin:20px 0;padding:20px;background:#f9fafb;border-radius:14px;border:1.5px solid #e4e4e7;">
+    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:10px;">📱 QR Code do Chamado</div>
+    <canvas id="qrCanvas" width="320" height="320" style="width:160px;height:160px;border-radius:8px;"></canvas>
+    <div style="font-size:11px;color:#9ca3af;margin-top:8px;">QR Code · ${c.protocolo}</div>
+  </div>
+
   <div class="footer">Simples Manutenção · Impresso em ${new Date().toLocaleString('pt-BR')}</div>
-  <script>window.onload = () => { window.print(); window.onafterprint = () => window.close(); }</script>
+  <script>
+    (function() {
+      var qrUrl = '${globalThis.location.origin}/chamado/${c.protocolo}';
+      function doPrint() {
+        setTimeout(function() { window.print(); window.onafterprint = function() { window.close(); }; }, 300);
+      }
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js';
+      s.onload = function() {
+        if (typeof QRCode !== 'undefined') {
+          var canvas = document.getElementById('qrCanvas');
+          QRCode.toCanvas(canvas, qrUrl, { width: 320, margin: 2 }, function(err) {
+            doPrint();
+          });
+        } else { doPrint(); }
+      };
+      s.onerror = function() { doPrint(); };
+      document.head.appendChild(s);
+    })();
+  </script>
   </body></html>`;
 
   const janela = window.open('', '_blank', 'width=800,height=700');
@@ -782,8 +808,14 @@ const MeusChamadosPage: React.FC = () => {
                       </div>
                     )}
 
-                    {/* Botão PDF individual */}
-                    <div style={{ display:'flex', justifyContent:'flex-end' }}>
+                    {/* Botões visualizar + PDF individual */}
+                    <div style={{ display:'flex', justifyContent:'flex-end', gap:8 }}>
+                      <button
+                        onClick={() => visualizarChamado(c)}
+                        style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', background:'#2563eb', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:800, cursor:'pointer' }}
+                      >
+                        <Eye size={15} /> Visualizar
+                      </button>
                       <button
                         onClick={() => imprimirChamado(c)}
                         style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 16px', background:'#dc2626', color:'#fff', border:'none', borderRadius:10, fontSize:13, fontWeight:800, cursor:'pointer' }}

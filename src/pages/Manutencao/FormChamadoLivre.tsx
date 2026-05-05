@@ -315,7 +315,7 @@ const FormChamadoLivre: React.FC<Props> = ({
                     <Camera size={22} />
                     <span>Foto</span>
                     <input
-                      type="file" accept="image/*" multiple capture="environment"
+                      type="file" accept="image/*" multiple
                       onChange={e => adicionarFotos(item.id, e)}
                       style={{ display:'none' }}
                     />

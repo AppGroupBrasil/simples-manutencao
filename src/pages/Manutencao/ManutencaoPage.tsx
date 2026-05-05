@@ -46,6 +46,43 @@ function CadastroMaquinasModal({ onClose }: { onClose: () => void }) {
   // ── Aba: cadastro | historico
   const [aba, setAba] = useState<'cadastro' | 'historico'>('cadastro');
 
+  // ── Busca na lista de máquinas cadastradas
+  const [buscaCadastro, setBuscaCadastro] = useState('');
+
+  // ── Edição de máquina
+  const [editandoIdx, setEditandoIdx] = useState<number | null>(null);
+  const [editNome, setEditNome] = useState('');
+  const [editCodigo, setEditCodigo] = useState('');
+  const [editSetor, setEditSetor] = useState('');
+  const [editLocalizacao, setEditLocalizacao] = useState('');
+  const [editModelo, setEditModelo] = useState('');
+  const [editMarca, setEditMarca] = useState('');
+
+  const iniciarEdicao = (idx: number) => {
+    const m = maquinas[idx];
+    setEditandoIdx(idx);
+    setEditNome(m.nome);
+    setEditCodigo(m.codigo);
+    setEditSetor(m.setor || '');
+    setEditLocalizacao(m.localizacao || '');
+    setEditModelo(m.modelo || '');
+    setEditMarca(m.marca || '');
+  };
+
+  const salvarEdicao = () => {
+    if (editandoIdx === null) return;
+    if (!editNome.trim()) { alert('Informe o nome da máquina.'); return; }
+    const duplicado = maquinas.some((m, i) => i !== editandoIdx && m.nome.toLowerCase() === editNome.trim().toLowerCase());
+    if (duplicado) { alert(`Máquina "${editNome.trim()}" já existe!`); return; }
+    const atualizada = { ...maquinas[editandoIdx], nome: editNome.trim(), codigo: editCodigo.trim(), setor: editSetor.trim() || undefined, localizacao: editLocalizacao.trim() || undefined, modelo: editModelo.trim() || undefined, marca: editMarca.trim() || undefined };
+    const lista = maquinas.map((m, i) => i === editandoIdx ? atualizada : m);
+    salvarMaq(lista);
+    setEditandoIdx(null);
+    alert('✅ Máquina atualizada!');
+  };
+
+  const cancelarEdicao = () => setEditandoIdx(null);
+
   // ── Filtros do histórico
   const [hBusca, setHBusca] = useState('');
   const [hSetor, setHSetor] = useState('');
@@ -202,31 +239,104 @@ function CadastroMaquinasModal({ onClose }: { onClose: () => void }) {
                 <div style={{ fontSize:12, fontWeight:800, color:'#6b7280', textTransform:'uppercase', letterSpacing:0.5, marginBottom:10 }}>
                   Máquinas Cadastradas ({maquinas.length})
                 </div>
+
+                {/* Busca na lista */}
+                {maquinas.length > 0 && (
+                  <div style={{ position:'relative', marginBottom:12 }}>
+                    <input
+                      value={buscaCadastro}
+                      onChange={e => setBuscaCadastro(e.target.value)}
+                      placeholder="🔍 Buscar por nome, código, Nº ou setor..."
+                      style={{ width:'100%', padding:'12px 40px 12px 14px', border:'2px solid #fde68a', borderRadius:12, fontSize:14, fontWeight:700, fontFamily:'inherit', outline:'none', boxSizing:'border-box', background:'#fffbeb' }}
+                    />
+                    {buscaCadastro && (
+                      <button onClick={() => setBuscaCadastro('')} style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', background:'none', border:'none', cursor:'pointer', fontSize:16, color:'#9ca3af' }}>✕</button>
+                    )}
+                  </div>
+                )}
+
                 {maquinas.length === 0 ? (
                   <div style={{ textAlign:'center', padding:'24px 16px', color:'#9ca3af', fontSize:13 }}>
                     Nenhuma máquina cadastrada ainda.
                   </div>
-                ) : (
-                  <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                    {maquinas.map((m, i) => (
-                      <div key={i} style={{ background:'#f9fafb', border:'1.5px solid #e5e7eb', borderRadius:12, padding:'12px 14px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                        <div style={{ minWidth:0, flex:1 }}>
-                          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-                            <span style={{ background:'#fef3c7', color:'#92400e', fontSize:11, fontWeight:900, padding:'2px 8px', borderRadius:6, fontFamily:'monospace' }}>Nº {m.numero}</span>
-                            <span style={{ fontSize:14, fontWeight:800, color:'#0D0D0D' }}>🖥️ {m.nome}</span>
-                          </div>
-                          <div style={{ fontSize:11, color:'#6b7280', marginTop:3, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                            {[m.codigo && `Cód: ${m.codigo}`, m.setor && `🏢 ${m.setor}`, m.modelo && `Mod: ${m.modelo}`, m.marca && m.marca, m.localizacao && `📍 ${m.localizacao}`].filter(Boolean).join(' • ') || 'Sem detalhes'}
-                          </div>
+                ) : (() => {
+                  const qCad = buscaCadastro.toLowerCase().trim();
+                  const maqsFiltradas = qCad
+                    ? maquinas.filter(m =>
+                        m.nome.toLowerCase().includes(qCad) ||
+                        m.codigo.toLowerCase().includes(qCad) ||
+                        m.numero.includes(qCad) ||
+                        (m.setor || '').toLowerCase().includes(qCad) ||
+                        (m.modelo || '').toLowerCase().includes(qCad) ||
+                        (m.marca || '').toLowerCase().includes(qCad) ||
+                        (m.localizacao || '').toLowerCase().includes(qCad)
+                      )
+                    : maquinas;
+                  return (
+                    <>
+                      {qCad && (
+                        <div style={{ fontSize:11, fontWeight:800, color:'#6b7280', marginBottom:8 }}>
+                          {maqsFiltradas.length} resultado{maqsFiltradas.length !== 1 ? 's' : ''} para &quot;{buscaCadastro}&quot;
                         </div>
-                        <button onClick={() => excluir(i)}
-                          style={{ background:'#fee2e2', border:'1.5px solid #fca5a5', borderRadius:8, width:32, height:32, color:'#dc2626', fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, marginLeft:8 }}>
-                          🗑️
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      )}
+                      {maqsFiltradas.length === 0 ? (
+                        <div style={{ textAlign:'center', padding:'24px 16px', color:'#9ca3af', fontSize:13 }}>
+                          Nenhuma máquina encontrada para &quot;{buscaCadastro}&quot;
+                        </div>
+                      ) : (
+                        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                          {maqsFiltradas.map((m, i) => {
+                            const idxOriginal = maquinas.indexOf(m);
+                            const editando = editandoIdx === idxOriginal;
+                            return editando ? (
+                              <div key={idxOriginal} style={{ background:'#fffbeb', border:'2px solid #f59e0b', borderRadius:12, padding:14 }}>
+                                <div style={{ fontSize:11, fontWeight:900, color:'#92400e', textTransform:'uppercase', letterSpacing:0.5, marginBottom:8 }}>✏️ Editando — Nº {m.numero}</div>
+                                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                                  <div>{fieldLbl('Nome *')}{fieldInput(editNome, setEditNome, 'Nome...')}</div>
+                                  <div>{fieldLbl('Código')}{fieldInput(editCodigo, setEditCodigo, 'Código...')}</div>
+                                </div>
+                                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:8 }}>
+                                  <div>{fieldLbl('Setor')}{fieldInput(editSetor, setEditSetor, 'Setor...')}</div>
+                                  <div>{fieldLbl('Localização')}{fieldInput(editLocalizacao, setEditLocalizacao, 'Local...')}</div>
+                                </div>
+                                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, marginTop:8 }}>
+                                  <div>{fieldLbl('Modelo')}{fieldInput(editModelo, setEditModelo, 'Modelo...')}</div>
+                                  <div>{fieldLbl('Marca')}{fieldInput(editMarca, setEditMarca, 'Marca...')}</div>
+                                </div>
+                                <div style={{ display:'flex', gap:8, marginTop:10 }}>
+                                  <button onClick={salvarEdicao} style={{ flex:1, padding:'10px', background:'linear-gradient(135deg,#FFD600,#FF8F00)', border:'none', borderRadius:10, fontSize:13, fontWeight:900, color:'#0D0D0D', cursor:'pointer' }}>💾 Salvar</button>
+                                  <button onClick={cancelarEdicao} style={{ flex:1, padding:'10px', background:'#f3f4f6', border:'1.5px solid #d1d5db', borderRadius:10, fontSize:13, fontWeight:700, color:'#6b7280', cursor:'pointer' }}>Cancelar</button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div key={idxOriginal} style={{ background:'#f9fafb', border:'1.5px solid #e5e7eb', borderRadius:12, padding:'12px 14px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                                <div style={{ minWidth:0, flex:1 }}>
+                                  <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                                    <span style={{ background:'#fef3c7', color:'#92400e', fontSize:11, fontWeight:900, padding:'2px 8px', borderRadius:6, fontFamily:'monospace' }}>Nº {m.numero}</span>
+                                    <span style={{ fontSize:14, fontWeight:800, color:'#0D0D0D' }}>🖥️ {m.nome}</span>
+                                  </div>
+                                  <div style={{ fontSize:11, color:'#6b7280', marginTop:3, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                                    {[m.codigo && `Cód: ${m.codigo}`, m.setor && `🏢 ${m.setor}`, m.modelo && `Mod: ${m.modelo}`, m.marca && m.marca, m.localizacao && `📍 ${m.localizacao}`].filter(Boolean).join(' • ') || 'Sem detalhes'}
+                                  </div>
+                                </div>
+                                <div style={{ display:'flex', gap:4, flexShrink:0, marginLeft:8 }}>
+                                  <button onClick={() => iniciarEdicao(idxOriginal)}
+                                    style={{ background:'#dbeafe', border:'1.5px solid #93c5fd', borderRadius:8, width:32, height:32, color:'#1d4ed8', fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                                    ✏️
+                                  </button>
+                                  <button onClick={() => excluir(idxOriginal)}
+                                    style={{ background:'#fee2e2', border:'1.5px solid #fca5a5', borderRadius:8, width:32, height:32, color:'#dc2626', fontSize:14, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                                    🗑️
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
             </>
           )}
@@ -457,7 +567,7 @@ function imprimirChamado(c: ChamadoManutencao) {
 
   <div style="text-align:center;margin:20px 0;padding:20px;background:#f9fafb;border-radius:14px;border:1.5px solid #e4e4e7;">
     <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.5px;color:#888;margin-bottom:10px;">📱 QR Code do Chamado</div>
-    <img id="qrImg" style="width:160px;height:160px;border-radius:8px;" />
+    <canvas id="qrCanvas" width="320" height="320" style="width:160px;height:160px;border-radius:8px;"></canvas>
     <div style="font-size:11px;color:#9ca3af;margin-top:8px;">QR Code · ${c.protocolo}</div>
   </div>
 
@@ -571,20 +681,43 @@ function imprimirChamado(c: ChamadoManutencao) {
   <div class="footer">Simples Manutenção · Impresso em ${new Date().toLocaleString('pt-BR')}</div>
   <script>
     (function() {
-      var qrImg = document.getElementById('qrImg');
+      var qrUrl = '${globalThis.location.origin}/chamado/${c.protocolo}';
+      function gerarQR() {
+        var canvas = document.getElementById('qrCanvas');
+        if (!canvas) { doPrint(); return; }
+        // Mini QR generator inline (sem dependência externa)
+        var modules = qrGenerate(qrUrl);
+        if (modules) {
+          var ctx = canvas.getContext('2d');
+          var size = modules.length;
+          var scale = 320 / size;
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(0, 0, 320, 320);
+          ctx.fillStyle = '#000';
+          for (var y = 0; y < size; y++) {
+            for (var x = 0; x < size; x++) {
+              if (modules[y][x]) ctx.fillRect(x * scale, y * scale, scale, scale);
+            }
+          }
+        }
+        doPrint();
+      }
+      function doPrint() {
+        setTimeout(function() { window.print(); window.onafterprint = function() { window.close(); }; }, 300);
+      }
+      // Tenta carregar a lib do CDN
       var s = document.createElement('script');
       s.src = 'https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js';
       s.onload = function() {
-        if (typeof QRCode !== 'undefined' && qrImg) {
-          QRCode.toDataURL('${globalThis.location.origin}/chamado/${c.protocolo}', { width: 320, margin: 2 }, function(err, dataUrl) {
-            if (!err) qrImg.src = dataUrl;
-            setTimeout(function() { window.print(); }, 500);
+        if (typeof QRCode !== 'undefined') {
+          var canvas = document.getElementById('qrCanvas');
+          QRCode.toCanvas(canvas, qrUrl, { width: 320, margin: 2 }, function(err) {
+            doPrint();
           });
-        } else { window.print(); }
+        } else { doPrint(); }
       };
-      s.onerror = function() { window.print(); };
+      s.onerror = function() { doPrint(); };
       document.head.appendChild(s);
-      window.onafterprint = function() { window.close(); };
     })();
   </script>
   </body></html>`;

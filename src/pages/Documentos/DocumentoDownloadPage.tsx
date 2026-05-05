@@ -70,7 +70,7 @@ const DocumentoDownloadPage: React.FC<Props> = ({ docId }) => {
         </button>
 
         <div className={styles.downloadRodape}>
-          <img src="/logos/logo.png" alt="Logo" style={{ height: 16, objectFit: 'contain', filter: 'drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000)' }} />
+          <img src="/logos/simples-manutencao.png?v=2" alt="Logo" style={{ height: 16, objectFit: 'contain' }} />
           Simples Manutenção
         </div>
       </div>

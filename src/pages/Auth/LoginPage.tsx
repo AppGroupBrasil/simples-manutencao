@@ -95,7 +95,7 @@ const LoginPage: React.FC = () => {
 
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <img src="/logos/logo.png" alt="Simples Manutenção" style={{ height: 108, objectFit: 'contain', marginBottom: 10, filter: 'drop-shadow(0 0 1px #000) drop-shadow(0 0 1px #000)' }} />
+          <img src="/logos/simples-manutencao.png?v=2" alt="Simples Manutenção" style={{ height: 108, objectFit: 'contain', marginBottom: 10 }} />
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 900, color: '#0D0D0D', letterSpacing: '-0.5px' }}>
             Simples Manutenção
           </h1>
