@@ -65,6 +65,16 @@ export default defineConfig({
   ],
   base: '/',
   build: {
-    outDir: 'dist'
+    outDir: 'dist',
+    chunkSizeWarningLimit: 600,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          react: ['react', 'react-dom', 'react-router-dom'],
+          recharts: ['recharts'],
+          qrcode: ['qrcode', 'qrcode.react'],
+        },
+      },
+    },
   }
 })

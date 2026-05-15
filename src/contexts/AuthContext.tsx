@@ -52,15 +52,11 @@ export function gerarLogin(nome: string): string {
     .replace(/\s+/g, '');
 }
 
-const USUARIOS_PADRAO: UsuarioComSenha[] = [
-  { id: '1', nome: 'Eduardo Dominikus', login: 'eduardodominikus@hotmail.com', email: 'eduardodominikus@hotmail.com', senha: '123456', role: 'master' },
-];
-
 function getUsuarios(): UsuarioComSenha[] {
   try {
     const v = localStorage.getItem(USUARIOS_KEY);
-    return v ? JSON.parse(v) : USUARIOS_PADRAO;
-  } catch { return USUARIOS_PADRAO; }
+    return v ? JSON.parse(v) : [];
+  } catch { return []; }
 }
 
 function salvarUsuarios(lista: UsuarioComSenha[]) {
@@ -72,9 +68,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
-    if (!localStorage.getItem(USUARIOS_KEY)) {
-      salvarUsuarios(USUARIOS_PADRAO);
-    }
     try {
       const s = localStorage.getItem(SESSION_KEY);
       if (s) {
@@ -90,35 +83,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (loginStr: string, senha: string) => {
-    // Try server first
-    try {
-      const data = await apiLogin(loginStr, senha);
-      if (data.usuario) {
-        setUsuario(data.usuario);
-        localStorage.setItem(SESSION_KEY, JSON.stringify(data.usuario));
-        // Sync: download server data to local
-        startAutoSync();
-        syncDownload().catch(() => {});
-        return;
-      }
-    } catch (apiErr: any) {
-      // If server explicitly rejects, throw that error
-      if (apiErr.message && !apiErr.message.includes('fetch') && !apiErr.message.includes('network') && !apiErr.message.includes('Failed')) {
-        throw apiErr;
-      }
-      // Otherwise fall through to localStorage
-    }
-
-    // Fallback: local
-    const usuarios = getUsuarios();
-    const found = usuarios.find(u =>
-      (u.login === loginStr || u.email === loginStr) && u.senha === senha
-    );
-    if (!found) throw new Error('Login ou senha incorretos');
-    if (found.bloqueado) throw new Error('Conta bloqueada por inadimplência. Entre em contato com o suporte.');
-    const { senha: _, ...user } = found;
-    setUsuario(user);
-    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+    const data = await apiLogin(loginStr, senha);
+    if (!data?.usuario) throw new Error('Resposta inválida do servidor');
+    setUsuario(data.usuario);
+    localStorage.setItem(SESSION_KEY, JSON.stringify(data.usuario));
+    startAutoSync();
+    syncDownload().catch(() => {});
   };
 
   const logout = () => {
@@ -131,44 +101,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const registrar = async (dados: { nome: string; email: string; senha: string }) => {
-    // Try server first
-    try {
-      const data = await apiRegister(dados.nome, dados.email, dados.senha);
-      if (data.usuario) {
-        setUsuario(data.usuario);
-        localStorage.setItem(SESSION_KEY, JSON.stringify(data.usuario));
-        startAutoSync();
-        // Also save locally
-        const usuarios = getUsuarios();
-        const emailNorm = dados.email.trim().toLowerCase();
-        if (!usuarios.some(u => u.login === emailNorm || u.email === emailNorm)) {
-          const novoLocal: UsuarioComSenha = {
-            ...data.usuario, senha: dados.senha,
-          };
-          salvarUsuarios([...usuarios, novoLocal]);
-        }
-        return;
-      }
-    } catch (apiErr: any) {
-      if (apiErr.message && !apiErr.message.includes('fetch') && !apiErr.message.includes('network') && !apiErr.message.includes('Failed')) {
-        throw apiErr;
-      }
-    }
-
-    // Fallback: local only
-    const usuarios = getUsuarios();
-    const emailNorm = dados.email.trim().toLowerCase();
-    if (usuarios.some(u => u.login === emailNorm || u.email === emailNorm)) throw new Error('Já existe uma conta com esse e-mail.');
-    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
-    const novoUsuario: UsuarioComSenha = {
-      id, nome: dados.nome.trim(), login: emailNorm, email: emailNorm,
-      role: 'administrador', senha: dados.senha,
-      adminId: id, administradorId: id,
-    };
-    salvarUsuarios([...usuarios, novoUsuario]);
-    const { senha: _s, ...user } = novoUsuario;
-    setUsuario(user);
-    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+    const data = await apiRegister(dados.nome, dados.email, dados.senha);
+    if (!data?.usuario) throw new Error('Resposta inválida do servidor');
+    setUsuario(data.usuario);
+    localStorage.setItem(SESSION_KEY, JSON.stringify(data.usuario));
+    startAutoSync();
   };
 
   const listarFuncionarios = (): Usuario[] => {
@@ -180,19 +117,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const criarFuncionario = (dados: { nome: string; cargo: string; senha: string; adminId?: string }) => {
     const usuarios = getUsuarios();
     const loginGerado = gerarLogin(dados.nome);
+    // Cache local SEM a senha (senha real fica no servidor com bcrypt)
     const novoUsuario: UsuarioComSenha = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5),
       nome: dados.nome,
       login: loginGerado,
       role: 'funcionario',
       cargo: dados.cargo,
-      senha: dados.senha,
+      senha: '',
       adminId: dados.adminId || usuario?.adminId,
       administradorId: dados.adminId || usuario?.administradorId,
     };
     salvarUsuarios([...usuarios, novoUsuario]);
 
-    // Also create on server
     apiCreateUser({ nome: dados.nome, cargo: dados.cargo, senha: dados.senha, role: 'funcionario' }).catch(() => {});
 
     return { login: loginGerado };

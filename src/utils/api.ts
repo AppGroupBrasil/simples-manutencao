@@ -1,4 +1,4 @@
-const API_URL = 'https://api.simplesmanutencao.com.br';
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined) || 'https://api.simplesmanutencao.com.br';
 
 const TOKEN_KEY = 'sm_auth_token';
 

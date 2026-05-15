@@ -45,26 +45,10 @@ const LoginPage: React.FC = () => {
     if (!email) { setRecResultado({ tipo:'erro', msg:'Digite seu e-mail.' }); return; }
     setRecLoading(true);
     try {
-      // Try API first
       await apiForgotPassword(email);
-      setRecResultado({ tipo:'ok', msg:'Um e-mail com instruções para redefinir sua senha foi enviado. Verifique sua caixa de entrada.' });
+      setRecResultado({ tipo:'ok', msg:'Se o e-mail estiver cadastrado, enviaremos instruções para redefinir sua senha. Verifique sua caixa de entrada e o spam.' });
     } catch (apiErr: any) {
-      // If network error, fall back to localStorage lookup
-      if (apiErr.message?.includes('fetch') || apiErr.message?.includes('network') || apiErr.message?.includes('Failed')) {
-        try {
-          const usuarios = JSON.parse(localStorage.getItem('sm_usuarios_v2') || '[]');
-          const found = usuarios.find((u: any) => u.email?.toLowerCase() === email);
-          if (found) {
-            setRecResultado({ tipo:'ok', msg:`Sua senha é: ${found.senha}\nSeu login é: ${found.login}` });
-          } else {
-            setRecResultado({ tipo:'erro', msg:'E-mail não encontrado. Verifique o e-mail cadastrado.' });
-          }
-        } catch {
-          setRecResultado({ tipo:'erro', msg:'Erro ao buscar dados. Tente novamente.' });
-        }
-      } else {
-        setRecResultado({ tipo:'erro', msg: apiErr.message || 'E-mail não encontrado.' });
-      }
+      setRecResultado({ tipo:'erro', msg: apiErr.message || 'Erro ao processar solicitação. Tente novamente.' });
     } finally {
       setRecLoading(false);
     }

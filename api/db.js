@@ -53,6 +53,14 @@ const stmtInsertUser = db.prepare(`
   VALUES (@id, @nome, @login, @email, @senha, @role, @cargo, @adminId, @supervisorId, @administradorId, @bloqueado, @plano, @cadastradoEm)
 `);
 
+// Indexes for hot lookup paths
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_usuarios_admin   ON usuarios(admin_id);
+  CREATE INDEX IF NOT EXISTS idx_usuarios_email   ON usuarios(email);
+  CREATE INDEX IF NOT EXISTS idx_dados_sync_user  ON dados_sync(usuario_id);
+  CREATE INDEX IF NOT EXISTS idx_reset_tokens_tok ON reset_tokens(token);
+`);
+
 const stmtFindByLogin = db.prepare(`SELECT * FROM usuarios WHERE login = ? OR email = ?`);
 const stmtFindByEmail = db.prepare(`SELECT * FROM usuarios WHERE LOWER(email) = LOWER(?)`);
 const stmtFindById = db.prepare(`SELECT * FROM usuarios WHERE id = ?`);
@@ -85,7 +93,6 @@ const stmtUpsertSync = db.prepare(`
 `);
 
 const stmtGetSync = db.prepare(`SELECT chave, valor, atualizado_em FROM dados_sync WHERE usuario_id = ?`);
-const stmtGetSyncKey = db.prepare(`SELECT valor, atualizado_em FROM dados_sync WHERE usuario_id = ? AND chave = ?`);
 
 // ── Reset token helpers ────────────────────────────────────
 const stmtInsertToken = db.prepare(`INSERT INTO reset_tokens (usuario_id, token, expira_em) VALUES (?, ?, ?)`);
@@ -101,7 +108,6 @@ module.exports = {
   stmtUpdateSenha,
   stmtUpsertSync,
   stmtGetSync,
-  stmtGetSyncKey,
   stmtInsertToken,
   stmtFindToken,
   stmtMarkTokenUsed,

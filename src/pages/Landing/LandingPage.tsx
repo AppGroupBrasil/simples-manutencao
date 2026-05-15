@@ -648,7 +648,6 @@ const LandingPage: React.FC = () => {
               { src: '/logos/App Portaria Logo.png',        nome: 'App Portaria',        url: 'https://appportaria.com.br'           },
               { src: '/logos/logo PortariaX.png',           nome: 'Portaria X',          url: 'https://portariax.com.br'             },
               { src: '/logos/Logo App Obras.png',           nome: 'App Obras',           url: 'https://appobras.com.br'              },
-              { src: '/logos/Logo App Revista.png',         nome: 'App Revista',         url: 'https://apprevista.com.br'            },
               { src: '/logos/Logo AppCorrespondencia.png',  nome: 'App Correspondência', url: 'https://appcorrespondencia.com.br'    },
               { src: '/logos/Logo Reserva.png',             nome: 'App Reserva',         url: null                                   },
               { src: '/logos/logo gestão.png',              nome: 'Gestão e Limpeza',    url: 'https://gestaoelimpeza.com.br'        },

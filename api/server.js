@@ -1,24 +1,65 @@
-const express = require('express');
-const fs      = require('fs');
-const path    = require('path');
-const cors    = require('cors');
-const { v4: uuidv4 }  = require('uuid');
-const nodemailer      = require('nodemailer');
+const express   = require('express');
+const fs        = require('fs');
+const path      = require('path');
+const cors      = require('cors');
+const bcrypt    = require('bcryptjs');
+const jwt       = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
+const { v4: uuidv4 } = require('uuid');
+const nodemailer     = require('nodemailer');
 
 const {
   db, stmtInsertUser, stmtFindByLogin, stmtFindByEmail, stmtFindById,
-  stmtUpdateSenha, stmtUpsertSync, stmtGetSync, stmtGetSyncKey,
+  stmtUpdateSenha, stmtUpsertSync, stmtGetSync,
   stmtInsertToken, stmtFindToken, stmtMarkTokenUsed, rowToUsuario,
 } = require('./db');
 
-const app        = express();
-const PORT       = process.env.PORT       || 3001;
-const API_KEY    = process.env.API_KEY    || 'simples-api-key-2024';
+const PROD = process.env.NODE_ENV === 'production';
+
+// Fail-fast em produção quando segredos não estão definidos
+function requireEnv(name) {
+  const v = process.env[name];
+  if (!v || !v.trim()) {
+    if (PROD) {
+      console.error(`[FATAL] Variável de ambiente obrigatória ausente: ${name}`);
+      process.exit(1);
+    }
+    return null;
+  }
+  return v;
+}
+
+const PORT       = process.env.PORT || 3001;
+const API_KEY    = PROD ? requireEnv('API_KEY')    : (process.env.API_KEY    || 'dev-api-key-CHANGE-ME');
+const JWT_SECRET = PROD ? requireEnv('JWT_SECRET') : (process.env.JWT_SECRET || 'dev-jwt-secret-CHANGE-ME');
 const TRIAL_DAYS = parseInt(process.env.TRIAL_DAYS || '7', 10);
-const DATA_FILE  = process.env.DATA_FILE  || '/data/trial-ips.json';
+const DATA_DIR   = process.env.DB_DIR || (PROD ? '/data' : path.join(__dirname, '.data'));
+const DATA_FILE  = process.env.DATA_FILE || path.join(DATA_DIR, 'trial-ips.json');
 const GMAIL_USER = process.env.GMAIL_USER || 'appgroupbrasil@gmail.com';
 const GMAIL_PASS = process.env.GMAIL_PASS || '';
-const BASE_URL   = process.env.BASE_URL   || 'https://simplesmanutencao.com.br';
+const BASE_URL   = process.env.BASE_URL || 'https://simplesmanutencao.com.br';
+const CORS_ORIGINS = (process.env.CORS_ORIGINS ||
+  'https://simplesmanutencao.com.br,https://www.simplesmanutencao.com.br,https://caldo.simplesmanutencao.com.br,http://localhost:5173,http://localhost:5174,http://localhost:5175'
+).split(',').map(s => s.trim()).filter(Boolean);
+
+const BCRYPT_ROUNDS = 10;
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '30d';
+
+function hashSenha(senha) { return bcrypt.hashSync(senha, BCRYPT_ROUNDS); }
+function verificarSenha(senhaInput, senhaArmazenada) {
+  if (!senhaArmazenada) return false;
+  // Compatibilidade legada: senhas em texto puro existentes serão re-hashed no próximo login
+  if (senhaArmazenada.startsWith('$2')) return bcrypt.compareSync(senhaInput, senhaArmazenada);
+  return senhaInput === senhaArmazenada;
+}
+function isLegacyPlaintext(senhaArmazenada) {
+  return senhaArmazenada && !senhaArmazenada.startsWith('$2');
+}
+function gerarToken(userId) {
+  return jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
+}
+
+const app = express();
 
 const transporter = GMAIL_PASS ? nodemailer.createTransport({
   host: 'smtp.gmail.com',
@@ -34,15 +75,29 @@ app.use(express.json({ limit: '50mb' }));
 app.set('trust proxy', true);
 
 app.use(cors({
-  origin: [
-    'https://simplesmanutencao.com.br',
-    'https://www.simplesmanutencao.com.br',
-    'http://localhost:5173',
-    'http://localhost:5174',
-    'http://localhost:5175',
-  ],
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);
+    if (CORS_ORIGINS.includes(origin)) return cb(null, true);
+    cb(new Error(`CORS bloqueado: ${origin}`));
+  },
   credentials: true,
 }));
+
+// ── Rate limiters ──────────────────────────────────────────
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas tentativas. Aguarde alguns minutos e tente novamente.' },
+});
+const trialLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Muitas requisições. Aguarde.' },
+});
 
 // ── Trial helpers (legacy – unchanged) ─────────────────────
 function loadData() {
@@ -80,8 +135,17 @@ const trialMs = () => TRIAL_DAYS * 24 * 60 * 60 * 1000;
 function requireAuth(req, res, next) {
   const token = (req.headers.authorization || '').replace('Bearer ', '');
   if (!token) return res.status(401).json({ error: 'Token ausente' });
-  // Token is the user ID (simple – no JWT needed for this app)
-  const row = stmtFindById.get(token);
+  let payload;
+  try {
+    payload = jwt.verify(token, JWT_SECRET);
+  } catch (err) {
+    // Compat: aceitar token legado = userId puro durante transição
+    const legacyRow = stmtFindById.get(token);
+    if (!legacyRow) return res.status(401).json({ error: 'Token inválido ou expirado' });
+    req.usuario = rowToUsuario(legacyRow);
+    return next();
+  }
+  const row = stmtFindById.get(payload.sub);
   if (!row) return res.status(401).json({ error: 'Token inválido' });
   req.usuario = rowToUsuario(row);
   next();
@@ -111,10 +175,11 @@ app.post('/admin/set-role', (req, res) => {
 });
 
 // ── POST /auth/register ────────────────────────────────────
-app.post('/auth/register', (req, res) => {
+app.post('/auth/register', authLimiter, (req, res) => {
   try {
     const { nome, email, senha } = req.body || {};
     if (!nome || !email || !senha) return res.status(400).json({ error: 'Nome, email e senha são obrigatórios' });
+    if (senha.length < 6) return res.status(400).json({ error: 'Senha deve ter pelo menos 6 caracteres' });
 
     const emailNorm = email.trim().toLowerCase();
     const existing = stmtFindByLogin.get(emailNorm, emailNorm);
@@ -123,14 +188,14 @@ app.post('/auth/register', (req, res) => {
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
     stmtInsertUser.run({
       id, nome: nome.trim(), login: emailNorm, email: emailNorm,
-      senha, role: 'administrador', cargo: null,
+      senha: hashSenha(senha), role: 'administrador', cargo: null,
       adminId: id, supervisorId: null, administradorId: id,
       bloqueado: 0, plano: null, cadastradoEm: Date.now(),
     });
 
     const user = rowToUsuario(stmtFindById.get(id));
     const { senha: _, ...safe } = user;
-    res.json({ ok: true, usuario: safe, token: id });
+    res.json({ ok: true, usuario: safe, token: gerarToken(id) });
   } catch (err) {
     console.error('register error:', err.message);
     res.status(500).json({ error: 'Erro ao registrar' });
@@ -138,7 +203,7 @@ app.post('/auth/register', (req, res) => {
 });
 
 // ── POST /auth/login ───────────────────────────────────────
-app.post('/auth/login', (req, res) => {
+app.post('/auth/login', authLimiter, (req, res) => {
   try {
     const { login, senha } = req.body || {};
     if (!login || !senha) return res.status(400).json({ error: 'Login e senha obrigatórios' });
@@ -148,11 +213,16 @@ app.post('/auth/login', (req, res) => {
     if (!row) return res.status(401).json({ error: 'Login ou senha incorretos' });
 
     const user = rowToUsuario(row);
-    if (user.senha !== senha) return res.status(401).json({ error: 'Login ou senha incorretos' });
+    if (!verificarSenha(senha, user.senha)) return res.status(401).json({ error: 'Login ou senha incorretos' });
     if (user.bloqueado) return res.status(403).json({ error: 'Conta bloqueada. Entre em contato com o suporte.' });
 
+    // Migra senha legada em texto puro para bcrypt no próximo login bem-sucedido
+    if (isLegacyPlaintext(user.senha)) {
+      try { stmtUpdateSenha.run(hashSenha(senha), Date.now(), user.id); } catch (e) { console.warn('migrate senha falhou:', e.message); }
+    }
+
     const { senha: _, ...safe } = user;
-    res.json({ ok: true, usuario: safe, token: user.id });
+    res.json({ ok: true, usuario: safe, token: gerarToken(user.id) });
   } catch (err) {
     console.error('login error:', err.message);
     res.status(500).json({ error: 'Erro ao fazer login' });
@@ -160,7 +230,7 @@ app.post('/auth/login', (req, res) => {
 });
 
 // ── POST /auth/forgot-password ─────────────────────────────
-app.post('/auth/forgot-password', async (req, res) => {
+app.post('/auth/forgot-password', authLimiter, async (req, res) => {
   try {
     const { email } = req.body || {};
     if (!email) return res.status(400).json({ error: 'E-mail obrigatório' });
@@ -216,16 +286,16 @@ app.post('/auth/forgot-password', async (req, res) => {
 });
 
 // ── POST /auth/reset-password ──────────────────────────────
-app.post('/auth/reset-password', (req, res) => {
+app.post('/auth/reset-password', authLimiter, (req, res) => {
   try {
     const { token, novaSenha } = req.body || {};
     if (!token || !novaSenha) return res.status(400).json({ error: 'Token e nova senha obrigatórios' });
-    if (novaSenha.length < 4) return res.status(400).json({ error: 'Senha deve ter pelo menos 4 caracteres' });
+    if (novaSenha.length < 6) return res.status(400).json({ error: 'Senha deve ter pelo menos 6 caracteres' });
 
     const row = stmtFindToken.get(token, Date.now());
     if (!row) return res.status(400).json({ error: 'Link expirado ou inválido. Solicite novamente.' });
 
-    stmtUpdateSenha.run(novaSenha, Date.now(), row.usuario_id);
+    stmtUpdateSenha.run(hashSenha(novaSenha), Date.now(), row.usuario_id);
     stmtMarkTokenUsed.run(token);
 
     res.json({ ok: true, msg: 'Senha alterada com sucesso!' });
@@ -241,13 +311,19 @@ app.post('/auth/create-user', requireAuth, (req, res) => {
   try {
     const { nome, cargo, senha, role } = req.body || {};
     if (!nome || !senha) return res.status(400).json({ error: 'Nome e senha obrigatórios' });
+    if (senha.length < 6) return res.status(400).json({ error: 'Senha deve ter pelo menos 6 caracteres' });
+    if (!['master', 'administrador', 'supervisor'].includes(req.usuario.role)) {
+      return res.status(403).json({ error: 'Sem permissão' });
+    }
+    const _validRoles = ['supervisor', 'funcionario'];
+    const _roleFinal = _validRoles.includes(role) ? role : 'funcionario';
 
     const loginGerado = nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '');
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 
     stmtInsertUser.run({
       id, nome: nome.trim(), login: loginGerado, email: null,
-      senha, role: role || 'funcionario', cargo: cargo || null,
+      senha: hashSenha(senha), role: _roleFinal, cargo: cargo || null,
       adminId: req.usuario.adminId || req.usuario.id,
       supervisorId: null, administradorId: req.usuario.administradorId || req.usuario.id,
       bloqueado: 0, plano: null, cadastradoEm: Date.now(),
@@ -264,7 +340,17 @@ app.post('/auth/create-user', requireAuth, (req, res) => {
 // ── DELETE /auth/user/:id ──────────────────────────────────
 app.delete('/auth/user/:id', requireAuth, (req, res) => {
   try {
-    db.prepare('DELETE FROM usuarios WHERE id = ?').run(req.params.id);
+    const alvoId = req.params.id;
+    if (alvoId === req.usuario.id) return res.status(400).json({ error: 'Você não pode excluir a si mesmo' });
+    const alvo = stmtFindById.get(alvoId);
+    if (!alvo) return res.status(404).json({ error: 'Usuário não encontrado' });
+
+    const meuAdmin = req.usuario.adminId || req.usuario.id;
+    const podeExcluir = req.usuario.role === 'master'
+      || (alvo.admin_id === meuAdmin && ['administrador', 'supervisor'].includes(req.usuario.role));
+    if (!podeExcluir) return res.status(403).json({ error: 'Sem permissão para excluir este usuário' });
+
+    db.prepare('DELETE FROM usuarios WHERE id = ?').run(alvoId);
     res.json({ ok: true });
   } catch (err) {
     console.error('delete-user error:', err.message);
@@ -384,7 +470,7 @@ app.get('/sync/status', requireAuth, (req, res) => {
 //  TRIAL ENDPOINTS (legacy – unchanged)
 // ══════════════════════════════════════════════════════════════
 
-app.post('/trial/check', (req, res) => {
+app.post('/trial/check', trialLimiter, (req, res) => {
   const ip   = getIP(req);
   const data = loadData();
   const record = data.ips.find(r => r.ip === ip);
@@ -398,7 +484,7 @@ app.post('/trial/check', (req, res) => {
   return res.json({ permitido: true, trialAtivo: true });
 });
 
-app.post('/trial/register', (req, res) => {
+app.post('/trial/register', trialLimiter, (req, res) => {
   const ip    = getIP(req);
   const email = (req.body?.email || '').trim().toLowerCase();
   const data  = loadData();
@@ -457,7 +543,7 @@ app.get('/chamado/:protocolo', (req, res) => {
 
     // Search all users' sync data for the chamado with this protocol
     const rows = db.prepare(
-      "SELECT valor FROM sync_data WHERE chave = 'manutencao_chamados_v2'"
+      "SELECT valor FROM dados_sync WHERE chave = 'manutencao_chamados_v2'"
     ).all();
 
     for (const row of rows) {
@@ -498,6 +584,6 @@ app.get('/chamado/:protocolo', (req, res) => {
 });
 
 // ── Health ─────────────────────────────────────────────────
-app.get('/health', (_req, res) => res.json({ ok: true, trialDias: TRIAL_DAYS, db: 'sqlite', resend: !!resend }));
+app.get('/health', (_req, res) => res.json({ ok: true, trialDias: TRIAL_DAYS, db: 'sqlite', email: !!transporter }));
 
-app.listen(PORT, () => console.log(`✅ API rodando na porta ${PORT} (SQLite + Sync + Resend)`));
+app.listen(PORT, () => console.log(`✅ API rodando na porta ${PORT} (SQLite + Sync + JWT + bcrypt)`));

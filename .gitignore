@@ -20,3 +20,12 @@ pnpm-debug.log*
 
 .DS_Store
 Thumbs.db
+
+# IDE/tooling artifacts
+tsconfig.tsbuildinfo
+__pycache__/
+*.bak
+
+# Local data (SQLite, trial-ips, etc.)
+api/.data/
+api/data/
