@@ -5,7 +5,9 @@
   "dependencies": {
     "better-sqlite3": "^11.7.0",
     "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
     "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.3",
     "nodemailer": "^6.9.16",
     "uuid": "^11.1.0"
   }

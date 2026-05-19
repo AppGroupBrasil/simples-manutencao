@@ -1,7 +1,9 @@
+require('dotenv').config();
 const express = require('express');
 const fs      = require('fs');
 const path    = require('path');
 const cors    = require('cors');
+const jwt     = require('jsonwebtoken');
 const { v4: uuidv4 }  = require('uuid');
 const nodemailer      = require('nodemailer');
 
@@ -19,6 +21,10 @@ const DATA_FILE  = process.env.DATA_FILE  || '/data/trial-ips.json';
 const GMAIL_USER = process.env.GMAIL_USER || 'appgroupbrasil@gmail.com';
 const GMAIL_PASS = process.env.GMAIL_PASS || '';
 const BASE_URL   = process.env.BASE_URL   || 'https://simplesmanutencao.com.br';
+const JWT_SECRET = process.env.JWT_SECRET || '';
+const PROVISIONING_SECRET = process.env.PROVISIONING_SECRET || '';
+const APP_SLUG = 'simples-manutencao';
+const STATUS_VALIDOS_LICENCA = new Set(['ativa', 'trial']);
 
 const transporter = GMAIL_PASS ? nodemailer.createTransport({
   host: 'smtp.gmail.com',
@@ -80,12 +86,96 @@ const trialMs = () => TRIAL_DAYS * 24 * 60 * 60 * 1000;
 function requireAuth(req, res, next) {
   const token = (req.headers.authorization || '').replace('Bearer ', '');
   if (!token) return res.status(401).json({ error: 'Token ausente' });
-  // Token is the user ID (simple – no JWT needed for this app)
+
+  // Token central (JWT do auth-central com apps[])
+  if (JWT_SECRET && token.split('.').length === 3) {
+    try {
+      const payload = jwt.verify(token, JWT_SECRET);
+      if (Array.isArray(payload.apps)) {
+        const licenca = payload.apps.find(a => a.slug === APP_SLUG);
+        if (!licenca || !STATUS_VALIDOS_LICENCA.has(licenca.status)) {
+          return res.status(403).json({ error: 'Sem licença ativa para Simples Manutenção' });
+        }
+        if (licenca.expira_em && new Date(licenca.expira_em) < new Date()) {
+          return res.status(403).json({ error: 'Licença expirada' });
+        }
+        let row = stmtFindById.get(payload.sub);
+        if (!row) {
+          const roleLocal = licenca.role === 'admin' || licenca.role === 'superadmin' ? 'administrador' : 'usuario';
+          stmtInsertUser.run({
+            id: payload.sub,
+            nome: payload.nome || payload.email || 'Usuário',
+            login: (payload.email || payload.sub).toLowerCase(),
+            email: payload.email || null,
+            senha: '!central!',
+            role: roleLocal,
+            cargo: null,
+            adminId: null,
+            supervisorId: null,
+            administradorId: null,
+            bloqueado: 0,
+            plano: null,
+            cadastradoEm: Date.now(),
+          });
+          row = stmtFindById.get(payload.sub);
+        }
+        req.usuario = rowToUsuario(row);
+        return next();
+      }
+    } catch (_) { /* nao e JWT central; cai pro legado */ }
+  }
+
+  // Legado: token = userId direto
   const row = stmtFindById.get(token);
   if (!row) return res.status(401).json({ error: 'Token inválido' });
   req.usuario = rowToUsuario(row);
   next();
 }
+
+// ══════════════════════════════════════════════════════════════
+//  PROVISIONING (webhook do auth-central)
+// ══════════════════════════════════════════════════════════════
+app.post('/provisioning/usuario', (req, res) => {
+  const secret = req.headers['x-provisioning-secret'];
+  if (!PROVISIONING_SECRET || secret !== PROVISIONING_SECRET) {
+    return res.status(403).json({ error: 'Assinatura inválida' });
+  }
+  const b = req.body || {};
+  if (!b.usuario_id || !b.email || !b.nome) {
+    return res.status(400).json({ error: 'Campos obrigatórios ausentes' });
+  }
+  const ativo = b.status === 'ativa' || b.status === 'trial';
+  const roleLocal = b.role === 'admin' || b.role === 'superadmin' ? 'administrador' : 'usuario';
+  const existing = stmtFindById.get(b.usuario_id);
+  if (existing) {
+    db.prepare(`UPDATE usuarios SET nome=?, email=?, login=?, role=?, bloqueado=?, atualizado_em=? WHERE id=?`)
+      .run(b.nome, b.email, b.email.toLowerCase(), roleLocal, ativo ? 0 : 1, Date.now(), b.usuario_id);
+  } else {
+    const porEmail = stmtFindByEmail.get(b.email);
+    if (porEmail) {
+      // Vincula o id central ao usuario existente por email (id eh TEXT, pode atualizar)
+      db.prepare(`UPDATE usuarios SET id=?, nome=?, role=?, bloqueado=?, atualizado_em=? WHERE id=?`)
+        .run(b.usuario_id, b.nome, roleLocal, ativo ? 0 : 1, Date.now(), porEmail.id);
+    } else {
+      stmtInsertUser.run({
+        id: b.usuario_id,
+        nome: b.nome,
+        login: b.email.toLowerCase(),
+        email: b.email,
+        senha: '!central!',
+        role: roleLocal,
+        cargo: null,
+        adminId: null,
+        supervisorId: null,
+        administradorId: null,
+        bloqueado: ativo ? 0 : 1,
+        plano: null,
+        cadastradoEm: Date.now(),
+      });
+    }
+  }
+  res.json({ ok: true, usuario_id: b.usuario_id });
+});
 
 // ══════════════════════════════════════════════════════════════
 //  AUTH ENDPOINTS
