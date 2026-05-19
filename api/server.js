@@ -1,4 +1,3 @@
-require('dotenv').config();
 const express   = require('express');
 const fs        = require('fs');
 const path      = require('path');
@@ -45,9 +44,6 @@ const CORS_ORIGINS = (process.env.CORS_ORIGINS ||
 
 const BCRYPT_ROUNDS = 10;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '30d';
-const APP_SLUG = 'simples-manutencao';
-const STATUS_VALIDOS_LICENCA = new Set(['ativa', 'trial']);
-const PROVISIONING_SECRET = process.env.PROVISIONING_SECRET || '';
 
 function hashSenha(senha) { return bcrypt.hashSync(senha, BCRYPT_ROUNDS); }
 function verificarSenha(senhaInput, senhaArmazenada) {
@@ -149,84 +145,11 @@ function requireAuth(req, res, next) {
     req.usuario = rowToUsuario(legacyRow);
     return next();
   }
-
-  // Token do auth-central traz `apps: [{slug,role,status,expira_em}]`
-  if (Array.isArray(payload.apps)) {
-    const licenca = payload.apps.find(a => a.slug === APP_SLUG);
-    if (!licenca || !STATUS_VALIDOS_LICENCA.has(licenca.status)) {
-      return res.status(403).json({ error: 'Sem licença ativa para Simples Manutenção' });
-    }
-    if (licenca.expira_em && new Date(licenca.expira_em) < new Date()) {
-      return res.status(403).json({ error: 'Licença expirada' });
-    }
-    // Lazy-provision: cria usuario local com mesmo UUID se ainda nao existe
-    let row = stmtFindById.get(payload.sub);
-    if (!row) {
-      const roleLocal = licenca.role === 'admin' || licenca.role === 'superadmin' ? 'administrador' : 'usuario';
-      stmtInsertUser.run({
-        id: payload.sub,
-        nome: payload.nome || payload.email || 'Usuário',
-        login: (payload.email || payload.sub).toLowerCase(),
-        email: payload.email || null,
-        senha: '!central!',
-        role: roleLocal,
-        cargo: null,
-        adminId: null,
-        supervisorId: null,
-        administradorId: null,
-        bloqueado: 0,
-        plano: null,
-        cadastradoEm: Date.now(),
-      });
-      row = stmtFindById.get(payload.sub);
-    }
-    req.usuario = rowToUsuario(row);
-    return next();
-  }
-
   const row = stmtFindById.get(payload.sub);
   if (!row) return res.status(401).json({ error: 'Token inválido' });
   req.usuario = rowToUsuario(row);
   next();
 }
-
-// ══════════════════════════════════════════════════════════════
-//  PROVISIONING (webhook do auth-central)
-// ══════════════════════════════════════════════════════════════
-app.post('/provisioning/usuario', (req, res) => {
-  const secret = req.headers['x-provisioning-secret'];
-  if (!PROVISIONING_SECRET || secret !== PROVISIONING_SECRET) {
-    return res.status(403).json({ error: 'Assinatura inválida' });
-  }
-  const b = req.body || {};
-  if (!b.usuario_id || !b.email || !b.nome) {
-    return res.status(400).json({ error: 'Campos obrigatórios ausentes' });
-  }
-  const ativo = b.status === 'ativa' || b.status === 'trial';
-  const roleLocal = b.role === 'admin' || b.role === 'superadmin' ? 'administrador' : 'usuario';
-  const existing = stmtFindById.get(b.usuario_id);
-  if (existing) {
-    db.prepare(`UPDATE usuarios SET nome=?, email=?, login=?, role=?, bloqueado=?, atualizado_em=? WHERE id=?`)
-      .run(b.nome, b.email, b.email.toLowerCase(), roleLocal, ativo ? 0 : 1, Date.now(), b.usuario_id);
-  } else {
-    stmtInsertUser.run({
-      id: b.usuario_id,
-      nome: b.nome,
-      login: b.email.toLowerCase(),
-      email: b.email,
-      senha: '!central!',
-      role: roleLocal,
-      cargo: null,
-      adminId: null,
-      supervisorId: null,
-      administradorId: null,
-      bloqueado: ativo ? 0 : 1,
-      plano: null,
-      cadastradoEm: Date.now(),
-    });
-  }
-  res.json({ ok: true, usuario_id: b.usuario_id });
-});
 
 // ══════════════════════════════════════════════════════════════
 //  AUTH ENDPOINTS
