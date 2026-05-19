@@ -588,6 +588,6 @@ app.get('/chamado/:protocolo', (req, res) => {
 });
 
 // ── Health ─────────────────────────────────────────────────
-app.get('/health', (_req, res) => res.json({ ok: true, trialDias: TRIAL_DAYS, db: 'sqlite', resend: !!resend }));
+app.get('/health', (_req, res) => res.json({ ok: true, trialDias: TRIAL_DAYS, db: 'sqlite' }));
 
 app.listen(PORT, () => console.log(`✅ API rodando na porta ${PORT} (SQLite + Sync + Resend)`));
