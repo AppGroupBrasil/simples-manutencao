@@ -28,7 +28,8 @@ docker run -d \
   -e NODE_ENV=production \
   -e PORT=3001 \
   -e API_KEY=945d2c6b5ff1e2732cee84ce7e5273c1ad161d3a73d1141fa38687fd774c1cc77d618c2628b673d5331f34170b1f2b34 \
-  -e JWT_SECRET=39e46b74fa0ca8307ba8fbaff7ae63bd4dd74f8c8b9784789fc2b4026492c912e51737e647d545d0787cb100469bb529 \
+  -e JWT_SECRET=Pi98buOwvJcivOq8P/g7EjLwk9i4C9EKfD9UPJ+bfnj/CxJwbqH6Et97QGvvhE1z \
+  -e PROVISIONING_SECRET=oqYp4Jn7aKEguFqM64HXDgxPZXXJzOp2qXd1B1sYZRk \
   -e JWT_EXPIRES_IN=30d \
   -e BASE_URL=https://simplesmanutencao.com.br \
   -e 'CORS_ORIGINS=https://simplesmanutencao.com.br,https://www.simplesmanutencao.com.br,https://caldo.simplesmanutencao.com.br,https://localhost,capacitor://localhost,http://localhost' \
