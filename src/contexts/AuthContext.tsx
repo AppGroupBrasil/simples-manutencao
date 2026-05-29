@@ -79,10 +79,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const s = localStorage.getItem(SESSION_KEY);
       if (s) {
         setUsuario(JSON.parse(s));
-        // If we have a token, start auto-sync and download latest data
+        // If we have a token, start auto-sync. Envia pendências offline ANTES de baixar,
+        // senão o download sobrescreveria alterações locais ainda não sincronizadas.
         if (getToken()) {
           startAutoSync();
-          syncDownload().catch(() => {});
+          syncUpload().catch(() => {}).then(() => syncDownload().catch(() => {}));
         }
       }
     } catch {}

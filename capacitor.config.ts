@@ -5,6 +5,9 @@ const config: CapacitorConfig = {
   appName: 'Simples Manutenção',
   webDir: 'dist',
   server: {
+    // App carrega o site publicado (atualizações via deploy, sem novo AAB).
+    // O service worker (PWA) faz o cache do shell para manter o funcionamento offline.
+    url: 'https://simplesmanutencao.com.br',
     androidScheme: 'https'
   },
   plugins: {

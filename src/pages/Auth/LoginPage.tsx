@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { apiForgotPassword } from '../../utils/api';
@@ -20,7 +20,21 @@ const LoginPage: React.FC = () => {
   const [recEmail, setRecEmail] = useState('');
   const [recResultado, setRecResultado] = useState<{ tipo:'ok'|'erro'; msg:string } | null>(null);
   const [recLoading, setRecLoading] = useState(false);
+  const [lembrar, setLembrar] = useState(false);
   const dicaRef = useRef<HTMLDivElement>(null);
+
+  // Carrega credenciais salvas
+  useEffect(() => {
+    try {
+      const salvo = localStorage.getItem('sm_lembrar_v1');
+      if (salvo) {
+        const { login: l, senha: s } = JSON.parse(salvo);
+        if (l) setLoginStr(l);
+        if (s) setSenha(s);
+        setLembrar(true);
+      }
+    } catch {}
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,6 +42,11 @@ const LoginPage: React.FC = () => {
     setLoading(true);
     try {
       await login(loginStr, senha);
+      if (lembrar) {
+        localStorage.setItem('sm_lembrar_v1', JSON.stringify({ login: loginStr, senha }));
+      } else {
+        localStorage.removeItem('sm_lembrar_v1');
+      }
       const redirect = sessionStorage.getItem('sm_redirect');
       sessionStorage.removeItem('sm_redirect');
       navigate(redirect || '/manutencao');
@@ -45,26 +64,16 @@ const LoginPage: React.FC = () => {
     if (!email) { setRecResultado({ tipo:'erro', msg:'Digite seu e-mail.' }); return; }
     setRecLoading(true);
     try {
-      // Try API first
       await apiForgotPassword(email);
       setRecResultado({ tipo:'ok', msg:'Um e-mail com instruções para redefinir sua senha foi enviado. Verifique sua caixa de entrada.' });
     } catch (apiErr: any) {
-      // If network error, fall back to localStorage lookup
-      if (apiErr.message?.includes('fetch') || apiErr.message?.includes('network') || apiErr.message?.includes('Failed')) {
-        try {
-          const usuarios = JSON.parse(localStorage.getItem('sm_usuarios_v2') || '[]');
-          const found = usuarios.find((u: any) => u.email?.toLowerCase() === email);
-          if (found) {
-            setRecResultado({ tipo:'ok', msg:`Sua senha é: ${found.senha}\nSeu login é: ${found.login}` });
-          } else {
-            setRecResultado({ tipo:'erro', msg:'E-mail não encontrado. Verifique o e-mail cadastrado.' });
-          }
-        } catch {
-          setRecResultado({ tipo:'erro', msg:'Erro ao buscar dados. Tente novamente.' });
-        }
-      } else {
-        setRecResultado({ tipo:'erro', msg: apiErr.message || 'E-mail não encontrado.' });
-      }
+      const semConexao = apiErr.message?.includes('fetch') || apiErr.message?.includes('network') || apiErr.message?.includes('Failed');
+      setRecResultado({
+        tipo:'erro',
+        msg: semConexao
+          ? 'Sem conexão com o servidor. Tente novamente em instantes.'
+          : (apiErr.message || 'Não foi possível processar a solicitação.'),
+      });
     } finally {
       setRecLoading(false);
     }
@@ -148,7 +157,7 @@ const LoginPage: React.FC = () => {
                 whiteSpace: 'nowrap', zIndex: 10,
                 boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
               }}>
-                Seu login é o seu nome sem acentos ou espaços.
+                Administrador: seu e-mail.<br />Funcionário: seu nome sem acentos ou espaços.
                 {/* Seta do balão */}
                 <div style={{
                   position: 'absolute', top: -6, right: 18,
@@ -212,7 +221,16 @@ const LoginPage: React.FC = () => {
             )}
           </div>
 
-          <div style={{ textAlign: 'right', marginTop: -6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: -6 }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: '#52525b', fontWeight: 600, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={lembrar}
+                onChange={e => setLembrar(e.target.checked)}
+                style={{ width: 16, height: 16, accentColor: '#FF8F00', cursor: 'pointer' }}
+              />
+              Lembrar usuário e senha
+            </label>
             <button
               type="button"
               onClick={() => { setShowRecuperar(true); setRecEmail(''); setRecResultado(null); }}

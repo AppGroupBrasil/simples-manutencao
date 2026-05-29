@@ -8,10 +8,11 @@ NEW_IMAGE=simples-manutencao:next
 TEST_NAME=simples-manutencao-test
 TEST_PORT=3503
 PROD_NAME=simples-manutencao
-COOLIFY_NAME=w8wkgccsk0000ok8ow0sks0s-223624228356
+# Detecta dinamicamente o container gerenciado pelo Coolify (o sufixo muda a cada redeploy)
+COOLIFY_NAME=$(docker ps -a --filter 'name=w8wkgccsk0000ok8ow0sks0s' --format '{{.Names}}' | head -1)
 
-echo '[1/6] Build...'
-docker build -t $NEW_IMAGE . || { echo 'BUILD FALHOU - Coolify intacto'; exit 1; }
+echo '[1/6] Build (Dockerfile: npm build a partir do fonte do git)...'
+docker build -t $NEW_IMAGE . || { echo 'BUILD FALHOU - producao intacta'; exit 1; }
 
 echo "[2/6] Container teste porta $TEST_PORT (sem Traefik)..."
 docker rm -f $TEST_NAME 2>/dev/null
@@ -29,7 +30,7 @@ fi
 echo "Teste OK ($HTTP)"
 
 echo '[4/6] Swap: para Coolify e sobe novo...'
-docker stop $COOLIFY_NAME 2>/dev/null || true
+[ -n "$COOLIFY_NAME" ] && docker stop "$COOLIFY_NAME" 2>/dev/null || true
 docker rm -f $PROD_NAME 2>/dev/null
 
 docker run -d --name $PROD_NAME --network coolify --restart unless-stopped \
@@ -57,7 +58,7 @@ echo "Producao retornou $PROD"
 if [ "$PROD" != "200" ] && [ "$PROD" != "301" ] && [ "$PROD" != "302" ]; then
   echo 'PRODUCAO FALHOU - ROLLBACK Coolify'
   docker rm -f $PROD_NAME
-  docker start $COOLIFY_NAME
+  [ -n "$COOLIFY_NAME" ] && docker start "$COOLIFY_NAME"
   exit 1
 fi
 

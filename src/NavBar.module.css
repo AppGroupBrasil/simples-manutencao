@@ -2,10 +2,11 @@
 .topBar {
   background: linear-gradient(135deg, #FFD600 0%, #FF8F00 100%);
   padding: 0 16px;
+  padding-top: env(safe-area-inset-top, 0px);
   display: flex;
   align-items: center;
   gap: 6px;
-  height: 54px;
+  height: calc(54px + env(safe-area-inset-top, 0px));
   box-shadow: 0 2px 12px rgba(255,143,0,0.3);
   position: sticky;
   top: 0;
@@ -108,7 +109,8 @@
     bottom: 0;
     left: 0;
     right: 0;
-    height: 62px;
+    height: calc(62px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     background: linear-gradient(135deg, #FFD600 0%, #FF8F00 100%);
     box-shadow: 0 -2px 16px rgba(255,143,0,0.35);
     z-index: 200;

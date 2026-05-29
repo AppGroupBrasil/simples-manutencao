@@ -5,9 +5,11 @@ import { AuthProvider } from './contexts/AuthContext'
 import App from './App'
 import './index.css'
 
-// Register PWA service worker only in browser (not inside Capacitor native app)
-const isCapacitor = !!(window as any).Capacitor?.isNativePlatform?.();
-if (!isCapacitor && 'serviceWorker' in navigator) {
+// Registra o service worker quando o app é servido de um host remoto (PWA no
+// navegador OU app Capacitor carregando via server.url). Em modo offline isso
+// mantém o shell em cache. Pulamos quando os assets já são locais (localhost).
+const isRemoteHost = location.protocol === 'https:' && location.hostname !== 'localhost';
+if (isRemoteHost && 'serviceWorker' in navigator) {
   import('virtual:pwa-register').then(({ registerSW }) => {
     registerSW({ immediate: true });
   });

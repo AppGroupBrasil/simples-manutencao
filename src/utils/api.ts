@@ -144,17 +144,25 @@ export async function syncDownload(): Promise<boolean> {
 
 // Auto-sync: upload every 60 seconds if logged in
 let syncInterval: ReturnType<typeof setInterval> | null = null;
+let onlineHandler: (() => void) | null = null;
 
 export function startAutoSync() {
   if (syncInterval) return;
   syncInterval = setInterval(() => {
     if (getToken()) syncUpload();
   }, 60_000);
+  // Sincroniza imediatamente quando a conexão voltar (sem esperar o ciclo de 60s)
+  onlineHandler = () => { if (getToken()) syncUpload(); };
+  window.addEventListener('online', onlineHandler);
 }
 
 export function stopAutoSync() {
   if (syncInterval) {
     clearInterval(syncInterval);
     syncInterval = null;
+  }
+  if (onlineHandler) {
+    window.removeEventListener('online', onlineHandler);
+    onlineHandler = null;
   }
 }
