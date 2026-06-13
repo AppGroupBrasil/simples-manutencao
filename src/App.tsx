@@ -8,6 +8,7 @@ import styles from './NavBar.module.css';
 const LandingPage      = React.lazy(() => import('./pages/Landing/LandingPage'));
 const LoginPage        = React.lazy(() => import('./pages/Auth/LoginPage'));
 const CadastroPage     = React.lazy(() => import('./pages/Auth/CadastroPage'));
+const SsoPage          = React.lazy(() => import('./pages/Auth/SsoPage'));
 const ManutencaoPage   = React.lazy(() => import('./pages/Manutencao/ManutencaoPage'));
 const FormPage         = React.lazy(() => import('./pages/Manutencao/FormPage'));
 const MeusChamadosPage = React.lazy(() => import('./pages/MeusChamados/MeusChamadosPage'));
@@ -179,6 +180,7 @@ const App: React.FC = () => {
         <Route path="/login" element={
           !carregando && usuario ? <Navigate to="/manutencao" replace /> : <LoginPage />
         } />
+        <Route path="/sso" element={<SsoPage />} />
         <Route path="/cadastro" element={
           !carregando && usuario ? <Navigate to="/manutencao" replace /> : <CadastroPage />
         } />

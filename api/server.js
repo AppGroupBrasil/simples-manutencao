@@ -132,6 +132,9 @@ function requireAuth(req, res, next) {
   next();
 }
 
+// ── SSO da central (login único, RS256/JWKS) ───────────────
+app.use('/sso', require('./sso'));
+
 // ══════════════════════════════════════════════════════════════
 //  PROVISIONING (webhook do auth-central)
 // ══════════════════════════════════════════════════════════════
