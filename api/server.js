@@ -180,6 +180,30 @@ app.post('/provisioning/usuario', (req, res) => {
   res.json({ ok: true, usuario_id: b.usuario_id });
 });
 
+// Receiver do push de cadastro da central (Fase 2 SSO). Espelho read-only:
+// usuarios (casa por email). upsert atualiza nome; delete revoga (bloqueado=1).
+app.post('/provisioning/cadastro', (req, res) => {
+  const secret = req.headers['x-provisioning-secret'];
+  if (!PROVISIONING_SECRET || secret !== PROVISIONING_SECRET) {
+    return res.status(403).json({ error: 'Assinatura inválida' });
+  }
+  const ev = req.body || {};
+  const d = ev.dados || {};
+  if (ev.entidade === 'morador' || ev.entidade === 'funcionario') {
+    const email = String(d.email || '').toLowerCase().trim();
+    if (!email) return res.json({ ok: true, ignorado: 'sem email' });
+    if (ev.acao === 'delete') {
+      db.prepare(`UPDATE usuarios SET bloqueado=1, atualizado_em=? WHERE lower(email)=?`).run(Date.now(), email);
+      return res.json({ ok: true });
+    }
+    if (d.nome) {
+      db.prepare(`UPDATE usuarios SET nome=?, bloqueado=0, atualizado_em=? WHERE lower(email)=?`).run(d.nome, Date.now(), email);
+    }
+    return res.json({ ok: true });
+  }
+  res.json({ ok: true, ignorado: ev.entidade });
+});
+
 // ══════════════════════════════════════════════════════════════
 //  AUTH ENDPOINTS
 // ══════════════════════════════════════════════════════════════
