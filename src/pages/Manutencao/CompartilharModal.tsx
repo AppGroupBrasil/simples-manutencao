@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Share2, Send, X, Check, Users } from 'lucide-react';
+import { Share2, Send, X, Check, Users, Link2 } from 'lucide-react';
 import { apiListUsers, apiCompartilharOS, apiGerarLinkOS } from '../../utils/api';
 import type { ChamadoManutencao } from './types';
 
@@ -38,6 +38,7 @@ const CompartilharModal: React.FC<{
   const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [enviando, setEnviando] = useState(false);
   const [enviado, setEnviado] = useState(false);
+  const [linkCopiado, setLinkCopiado] = useState(false);
   const [erro, setErro] = useState('');
 
   useEffect(() => {
@@ -85,6 +86,24 @@ const CompartilharModal: React.FC<{
       const texto = `${textoWhatsApp}\n\n📲 Abrir no aplicativo: ${url}`;
       window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
       onFechar();
+    } catch {
+      setErro('Falha ao gerar o link. Tente novamente.');
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  const copiarLink = async () => {
+    setEnviando(true); setErro('');
+    try {
+      const { url } = await apiGerarLinkOS(chamado);
+      try {
+        await navigator.clipboard.writeText(url);
+      } catch {
+        window.prompt('Copie o link abaixo:', url);
+      }
+      setLinkCopiado(true);
+      setTimeout(() => setLinkCopiado(false), 2500);
     } catch {
       setErro('Falha ao gerar o link. Tente novamente.');
     } finally {
@@ -167,6 +186,11 @@ const CompartilharModal: React.FC<{
             <button onClick={enviarWhatsApp} disabled={enviando}
               style={{ width:'100%', marginTop:10, padding:'13px', background:'#25D366', border:'none', borderRadius:14, fontSize:14, fontWeight:900, color:'#fff', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, opacity: enviando ? 0.6 : 1 }}>
               💬 Enviar link pelo WhatsApp
+            </button>
+
+            <button onClick={copiarLink} disabled={enviando}
+              style={{ width:'100%', marginTop:10, padding:'13px', background:'#fff', border:'2px solid #e4e4e7', borderRadius:14, fontSize:14, fontWeight:900, color: linkCopiado ? '#15803d' : '#374151', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', gap:8, opacity: enviando ? 0.6 : 1 }}>
+              {linkCopiado ? <><Check size={17} color="#15803d" /> Link copiado!</> : <><Link2 size={17} /> Copiar link (e-mail ou outro app)</>}
             </button>
           </>
         )}
