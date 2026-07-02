@@ -12,6 +12,7 @@ const {
   stmtUpdateSenha, stmtUpsertSync, stmtGetSync, stmtGetSyncKey,
   stmtInsertToken, stmtFindToken, stmtMarkTokenUsed, rowToUsuario,
   stmtInsertOsComp, stmtGetOsCompPara, stmtMarkOsCompRecebida,
+  stmtInsertOsLink, stmtGetOsLink,
 } = require('./db');
 
 const app        = express();
