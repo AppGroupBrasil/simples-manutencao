@@ -25,6 +25,7 @@ const OSAssistenciaTecnicaPage = React.lazy(() => import('./pages/Manutencao/OSA
 const OSPublicaPage = React.lazy(() => import('./pages/Manutencao/OSPublicaPage'));
 const ChamadoPublicoPage = React.lazy(() => import('./pages/Manutencao/ChamadoPublicoPage'));
 const TutorialPage = React.lazy(() => import('./pages/Tutorial/TutorialPage'));
+const OsCompartilhadaPage = React.lazy(() => import('./pages/Manutencao/OsCompartilhadaPage'));
 
 const DocDownloadWrapper: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -215,6 +216,9 @@ const App: React.FC = () => {
         <Route path="/os-assistencia-tecnica" element={<OSAssistenciaTecnicaPage />} />
         <Route path="/os-publica/:modelo" element={<OSPublicaPage />} />
         <Route path="/chamado/:protocolo" element={<ChamadoPublicoPage />} />
+        <Route path="/os-compartilhada" element={
+          <ProtectedRoute><OsCompartilhadaPage /></ProtectedRoute>
+        } />
         <Route path="/tutorial" element={<TutorialPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

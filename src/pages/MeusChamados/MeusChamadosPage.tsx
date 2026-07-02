@@ -225,8 +225,8 @@ const MeusChamadosPage: React.FC = () => {
         c.criadoPor === userId || c.supervisorId === userId
       );
     }
-    // Funcionário vê chamados atribuídos a ele
-    return chamados.filter(c => c.responsavelId === userId || c.criadoPor === userId);
+    // Funcionário vê chamados atribuídos a ele ou compartilhados com ele
+    return chamados.filter(c => c.responsavelId === userId || c.criadoPor === userId || c.compartilhadoCom?.includes(userId));
   }, [chamados, role, userId]);
 
   // ── Tipos únicos ──────────────────────────────────────────────────────────

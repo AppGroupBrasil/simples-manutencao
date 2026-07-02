@@ -76,6 +76,36 @@ export async function apiListUsers() {
   return apiFetch('/auth/users');
 }
 
+// ── OS compartilhadas ──────────────────────────────────────
+export async function apiCompartilharOS(chamado: unknown, paraIds: string[]) {
+  return apiFetch('/os/compartilhar', {
+    method: 'POST',
+    body: JSON.stringify({ chamado, paraIds }),
+  });
+}
+
+export async function apiReceberOS(): Promise<{ ok: boolean; itens: { id: number; chamado: Record<string, unknown>; deId: string; deNome: string; criadoEm: number }[] }> {
+  return apiFetch('/os/recebidas');
+}
+
+export async function apiConfirmarOS(ids: number[]) {
+  return apiFetch('/os/recebidas/confirmar', {
+    method: 'POST',
+    body: JSON.stringify({ ids }),
+  });
+}
+
+export async function apiGerarLinkOS(chamado: unknown): Promise<{ ok: boolean; token: string; url: string }> {
+  return apiFetch('/os/link', {
+    method: 'POST',
+    body: JSON.stringify({ chamado }),
+  });
+}
+
+export async function apiBuscarLinkOS(token: string): Promise<{ ok: boolean; chamado: Record<string, unknown>; deNome: string }> {
+  return apiFetch(`/os/link/${encodeURIComponent(token)}`);
+}
+
 // ── Sync ───────────────────────────────────────────────────
 const SYNC_KEYS = [
   'manutencao_chamados_v2',

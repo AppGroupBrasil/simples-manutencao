@@ -12,6 +12,8 @@ import { BLOCOS_DISPONIVEIS } from './constants';
 import styles from './Manutencao.module.css';
 import { useTilesPrefs, GearButton, TilesConfigModal, TilesRenderer, carregarTilesOcultos } from './TilesConfig';
 import { usePin, PinModal } from '../../components/PinProtecao';
+import CompartilharModal from './CompartilharModal';
+import { apiReceberOS, apiConfirmarOS } from '../../utils/api';
 import type { TileAction } from './TilesConfig';
 
 function gerarQrDataUrl(chamadoId: string): string {
@@ -467,7 +469,7 @@ const STATUS_LABEL: Record<string, string> = {
   cancelado: '⛔ Cancelado',
 };
 
-function compartilharChamado(c: ChamadoManutencao) {
+function gerarTextoWhatsApp(c: ChamadoManutencao): string {
   const linhas = [
     `🛠️ *${c.funcaoNome}*`,
     ``,
@@ -498,15 +500,8 @@ function compartilharChamado(c: ChamadoManutencao) {
   }
 
   const link = `${globalThis.location.origin}/chamado/${c.protocolo}`;
-  linhas.push('', `🔗 Ver chamado: ${link}`, `📱 QR Code: ${link}`, '_Enviado pelo Simples Manutenção_');
-  const texto = linhas.join('\n');
-
-  if (navigator.share) {
-    navigator.share({ title: c.funcaoNome, text: texto }).catch(() => {});
-  } else {
-    const url = `https://wa.me/?text=${encodeURIComponent(texto)}`;
-    window.open(url, '_blank');
-  }
+  linhas.push('', `🔗 Ver chamado: ${link}`, '_Enviado pelo Simples Manutenção_');
+  return linhas.join('\n');
 }
 
 function imprimirChamado(c: ChamadoManutencao) {
@@ -1541,6 +1536,7 @@ const ManutencaoPage: React.FC = () => {
   const [editandoChamado, setEditandoChamado] = useState<ChamadoManutencao | null>(null);
   const [, setQrAmpliado] = useState<ChamadoManutencao | null>(null);
   const [confirmandoExclusao, setConfirmandoExclusao] = useState<string | null>(null);
+  const [compartilhando, setCompartilhando] = useState<ChamadoManutencao | null>(null);
   const [osConfigAberto, setOsConfigAberto] = useState(false);
   const [osModalAberto, setOsModalAberto] = useState(false);
   const [cadMaquinasAberto, setCadMaquinasAberto] = useState(false);
@@ -1580,6 +1576,40 @@ const ManutencaoPage: React.FC = () => {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // roda apenas na montagem
+
+  // Busca OS compartilhadas comigo no servidor (na abertura e a cada 60s)
+  useEffect(() => {
+    let ativo = true;
+    const buscar = async () => {
+      try {
+        const { itens } = await apiReceberOS();
+        if (!ativo || !itens || itens.length === 0) return;
+        setChamados(prev => {
+          const proximos = [...prev];
+          for (const item of itens) {
+            const recebido = item.chamado as unknown as ChamadoManutencao;
+            const idx = proximos.findIndex(c => c.id === recebido.id);
+            const marcado = {
+              ...recebido,
+              compartilhadoCom: Array.from(new Set([...(recebido.compartilhadoCom || []), userId])),
+              compartilhadoPor: item.deNome,
+            };
+            if (idx >= 0) {
+              proximos[idx] = { ...proximos[idx], compartilhadoCom: marcado.compartilhadoCom, compartilhadoPor: marcado.compartilhadoPor };
+            } else {
+              proximos.unshift(marcado);
+            }
+          }
+          salvar(CHAMADOS_KEY, proximos);
+          return proximos;
+        });
+        await apiConfirmarOS(itens.map(i => i.id));
+      } catch { /* offline — tenta no próximo ciclo */ }
+    };
+    buscar();
+    const t = setInterval(buscar, 60_000);
+    return () => { ativo = false; clearInterval(t); };
+  }, [userId]);
 
   useEffect(() => {
     const ativos = chamados.filter(c => c.status !== 'concluido' && c.status !== 'cancelado');
@@ -1710,7 +1740,7 @@ const ManutencaoPage: React.FC = () => {
   // ── Filtros ──────────────────────────────────────────────────────────────
   const meusChamadosVisiveis = useMemo(() => chamados.filter(c =>
     c.status !== 'cancelado' &&
-    (podeGerenciar || c.responsavelId === userId || c.criadoPor === userId)
+    (podeGerenciar || c.responsavelId === userId || c.criadoPor === userId || c.compartilhadoCom?.includes(userId))
   ), [chamados, podeGerenciar, userId]);
 
   const meusChamadosAtivos = useMemo(() => meusChamadosVisiveis.filter(c =>
@@ -2032,9 +2062,9 @@ const ManutencaoPage: React.FC = () => {
 
         {/* Botão compartilhar */}
         <button
-          onClick={() => compartilharChamado(c)}
+          onClick={() => setCompartilhando(c)}
           style={{ display:'flex', alignItems:'center', justifyContent:'center', padding:'8px', background:'rgba(37,211,102,0.12)', border:'1.5px solid rgba(37,211,102,0.4)', borderRadius:10, color:'#16a34a', cursor:'pointer', width:36, height:36 }}
-          title="Compartilhar via WhatsApp"
+          title="Compartilhar com a equipe ou WhatsApp"
         >
           <Share2 size={16} />
         </button>
@@ -2276,6 +2306,14 @@ const ManutencaoPage: React.FC = () => {
 
           {/* PIN de proteção */}
           <PinModal aberto={pinAberto} onSucesso={pinSucesso} onFechar={pinFechar} />
+          {compartilhando && (
+            <CompartilharModal
+              chamado={compartilhando}
+              usuarioId={userId}
+              textoWhatsApp={gerarTextoWhatsApp(compartilhando)}
+              onFechar={() => setCompartilhando(null)}
+            />
+          )}
 
           {/* Busca */}
           <div style={{ position:'relative', marginBottom: 12 }}>
@@ -2452,7 +2490,7 @@ const ManutencaoPage: React.FC = () => {
           adminId={usuario?.adminId}
           supervisorId={usuario?.supervisorId}
           onExcluir={podeGerenciar ? excluirChamado : undefined}
-          onCompartilhar={compartilharChamado}
+          onCompartilhar={setCompartilhando}
           onImprimir={imprimirChamado}
         />
       )}

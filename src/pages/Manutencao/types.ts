@@ -58,6 +58,8 @@ export interface ChamadoManutencao {
   supervisorId?: string;
   osTitulo?: string;
   osNumero?: string;
+  compartilhadoCom?: string[];
+  compartilhadoPor?: string;
 }
 
 // ── Dados de orçamento embutido no chamado ────────────────────────────────

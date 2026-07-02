@@ -71,8 +71,8 @@ const PainelEnviadas: React.FC<Props> = ({
         c.supervisorId === usuarioId || c.criadoPor === usuarioId
       );
     }
-    // funcionário/cliente/morador — só os próprios
-    return chamados.filter(c => c.criadoPor === usuarioId);
+    // funcionário/cliente/morador — os próprios ou compartilhados com ele
+    return chamados.filter(c => c.criadoPor === usuarioId || c.responsavelId === usuarioId || c.compartilhadoCom?.includes(usuarioId));
   }, [chamados, usuarioId, usuarioRole, adminId, supervisorId]);
 
   // ── Tipos únicos para filtro ──────────────────────────────────────────────

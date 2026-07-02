@@ -38,6 +38,24 @@ db.exec(`
     UNIQUE(usuario_id, chave)
   );
 
+  CREATE TABLE IF NOT EXISTS os_compartilhadas (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    chamado    TEXT NOT NULL,
+    de_id      TEXT NOT NULL,
+    de_nome    TEXT NOT NULL,
+    para_id    TEXT NOT NULL,
+    criado_em  INTEGER DEFAULT (strftime('%s','now') * 1000),
+    recebido   INTEGER DEFAULT 0
+  );
+  CREATE INDEX IF NOT EXISTS idx_os_comp_para ON os_compartilhadas (para_id, recebido);
+
+  CREATE TABLE IF NOT EXISTS os_links (
+    token      TEXT PRIMARY KEY,
+    chamado    TEXT NOT NULL,
+    de_nome    TEXT NOT NULL,
+    criado_em  INTEGER DEFAULT (strftime('%s','now') * 1000)
+  );
+
   CREATE TABLE IF NOT EXISTS reset_tokens (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     usuario_id TEXT NOT NULL,
@@ -87,6 +105,23 @@ const stmtUpsertSync = db.prepare(`
 const stmtGetSync = db.prepare(`SELECT chave, valor, atualizado_em FROM dados_sync WHERE usuario_id = ?`);
 const stmtGetSyncKey = db.prepare(`SELECT valor, atualizado_em FROM dados_sync WHERE usuario_id = ? AND chave = ?`);
 
+// ── OS compartilhadas helpers ──────────────────────────────
+const stmtInsertOsComp = db.prepare(`
+  INSERT INTO os_compartilhadas (chamado, de_id, de_nome, para_id, criado_em)
+  VALUES (?, ?, ?, ?, ?)
+`);
+const stmtGetOsCompPara = db.prepare(`
+  SELECT id, chamado, de_id, de_nome, criado_em FROM os_compartilhadas
+  WHERE para_id = ? AND recebido = 0 ORDER BY criado_em
+`);
+const stmtMarkOsCompRecebida = db.prepare(`
+  UPDATE os_compartilhadas SET recebido = 1 WHERE id = ? AND para_id = ?
+`);
+const stmtInsertOsLink = db.prepare(`
+  INSERT INTO os_links (token, chamado, de_nome, criado_em) VALUES (?, ?, ?, ?)
+`);
+const stmtGetOsLink = db.prepare(`SELECT chamado, de_nome, criado_em FROM os_links WHERE token = ?`);
+
 // ── Reset token helpers ────────────────────────────────────
 const stmtInsertToken = db.prepare(`INSERT INTO reset_tokens (usuario_id, token, expira_em) VALUES (?, ?, ?)`);
 const stmtFindToken = db.prepare(`SELECT * FROM reset_tokens WHERE token = ? AND usado = 0 AND expira_em > ?`);
@@ -102,6 +137,11 @@ module.exports = {
   stmtUpsertSync,
   stmtGetSync,
   stmtGetSyncKey,
+  stmtInsertOsComp,
+  stmtGetOsCompPara,
+  stmtMarkOsCompRecebida,
+  stmtInsertOsLink,
+  stmtGetOsLink,
   stmtInsertToken,
   stmtFindToken,
   stmtMarkTokenUsed,

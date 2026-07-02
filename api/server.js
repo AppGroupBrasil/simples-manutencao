@@ -11,6 +11,7 @@ const {
   db, stmtInsertUser, stmtFindByLogin, stmtFindByEmail, stmtFindById,
   stmtUpdateSenha, stmtUpsertSync, stmtGetSync, stmtGetSyncKey,
   stmtInsertToken, stmtFindToken, stmtMarkTokenUsed, rowToUsuario,
+  stmtInsertOsComp, stmtGetOsCompPara, stmtMarkOsCompRecebida,
 } = require('./db');
 
 const app        = express();
@@ -403,6 +404,93 @@ app.get('/auth/users', requireAuth, (req, res) => {
   } catch (err) {
     console.error('list-users error:', err.message);
     res.status(500).json({ error: 'Erro ao listar' });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+//  OS COMPARTILHADAS (envio direto entre usuários + link)
+// ══════════════════════════════════════════════════════════════
+
+// ── POST /os/compartilhar { chamado, paraIds: [] } ─────────
+app.post('/os/compartilhar', requireAuth, (req, res) => {
+  try {
+    const { chamado, paraIds } = req.body || {};
+    if (!chamado || !Array.isArray(paraIds) || paraIds.length === 0) {
+      return res.status(400).json({ error: 'chamado e paraIds são obrigatórios' });
+    }
+    const json = JSON.stringify(chamado);
+    const now = Date.now();
+    const tx = db.transaction(() => {
+      for (const paraId of paraIds) {
+        if (paraId === req.usuario.id) continue;
+        stmtInsertOsComp.run(json, req.usuario.id, req.usuario.nome, String(paraId), now);
+      }
+    });
+    tx();
+    res.json({ ok: true, enviados: paraIds.length });
+  } catch (err) {
+    console.error('os-compartilhar error:', err.message);
+    res.status(500).json({ error: 'Erro ao compartilhar' });
+  }
+});
+
+// ── GET /os/recebidas ──────────────────────────────────────
+app.get('/os/recebidas', requireAuth, (req, res) => {
+  try {
+    const rows = stmtGetOsCompPara.all(req.usuario.id);
+    const itens = rows.map(r => ({
+      id: r.id,
+      chamado: JSON.parse(r.chamado),
+      deId: r.de_id,
+      deNome: r.de_nome,
+      criadoEm: r.criado_em,
+    }));
+    res.json({ ok: true, itens });
+  } catch (err) {
+    console.error('os-recebidas error:', err.message);
+    res.status(500).json({ error: 'Erro ao buscar' });
+  }
+});
+
+// ── POST /os/recebidas/confirmar { ids: [] } ───────────────
+app.post('/os/recebidas/confirmar', requireAuth, (req, res) => {
+  try {
+    const { ids } = req.body || {};
+    if (!Array.isArray(ids)) return res.status(400).json({ error: 'ids obrigatório' });
+    const tx = db.transaction(() => {
+      for (const id of ids) stmtMarkOsCompRecebida.run(id, req.usuario.id);
+    });
+    tx();
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('os-confirmar error:', err.message);
+    res.status(500).json({ error: 'Erro ao confirmar' });
+  }
+});
+
+// ── POST /os/link { chamado } → { token } (p/ WhatsApp) ────
+app.post('/os/link', requireAuth, (req, res) => {
+  try {
+    const { chamado } = req.body || {};
+    if (!chamado) return res.status(400).json({ error: 'chamado obrigatório' });
+    const token = uuidv4();
+    stmtInsertOsLink.run(token, JSON.stringify(chamado), req.usuario.nome, Date.now());
+    res.json({ ok: true, token, url: `${BASE_URL}/os-compartilhada?t=${token}` });
+  } catch (err) {
+    console.error('os-link error:', err.message);
+    res.status(500).json({ error: 'Erro ao gerar link' });
+  }
+});
+
+// ── GET /os/link/:token (público — token não adivinhável) ──
+app.get('/os/link/:token', (req, res) => {
+  try {
+    const row = stmtGetOsLink.get(req.params.token);
+    if (!row) return res.status(404).json({ error: 'Link inválido ou expirado' });
+    res.json({ ok: true, chamado: JSON.parse(row.chamado), deNome: row.de_nome, criadoEm: row.criado_em });
+  } catch (err) {
+    console.error('os-link-get error:', err.message);
+    res.status(500).json({ error: 'Erro ao buscar link' });
   }
 });
 
