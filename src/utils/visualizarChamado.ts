@@ -36,9 +36,12 @@ export async function visualizarChamado(c: ChamadoManutencao) {
   const entries = Object.entries(c.respostas || {});
   if (entries.length > 0) {
     respostasHtml = '<div class="section"><div class="section-title">📝 Respostas do Formulário</div>';
-    entries.forEach(([, val]) => {
+    entries.forEach(([chave, val]) => {
       if (val === '' || val === null || val === undefined) return;
+      const rotulo = c.respostasLabels?.[chave] || '';
+      const rotuloHtml = rotulo ? `<div class="resp-campo">${rotulo}</div>` : '';
       if (Array.isArray(val) && val.length > 0 && typeof val[0] === 'object' && val[0].descricao !== undefined) {
+        if (rotulo) respostasHtml += `<div class="resp-campo" style="margin-bottom:6px">${rotulo}</div>`;
         val.forEach((item: any, idx: number) => {
           respostasHtml += `<div class="resp-item"><div class="resp-badge">Item ${idx + 1}</div>`;
           if (item.descricao) respostasHtml += `<div class="resp-texto">${item.descricao}</div>`;
@@ -52,9 +55,9 @@ export async function visualizarChamado(c: ChamadoManutencao) {
           respostasHtml += '</div>';
         });
       } else if (typeof val === 'string' && val.startsWith('data:image')) {
-        respostasHtml += `<div class="resp-item"><img src="${val}" style="max-width:200px;border-radius:10px;border:1px solid #e5e7eb;" /></div>`;
+        respostasHtml += `<div class="resp-item">${rotuloHtml}<img src="${val}" style="max-width:200px;border-radius:10px;border:1px solid #e5e7eb;" /></div>`;
       } else if (Array.isArray(val) && val.some((v: any) => typeof v === 'string' && v.startsWith('data:image'))) {
-        respostasHtml += '<div class="resp-item"><div class="fotos-row">';
+        respostasHtml += `<div class="resp-item">${rotuloHtml}<div class="fotos-row">`;
         val.forEach((v: any) => {
           if (typeof v === 'string' && v.startsWith('data:image'))
             respostasHtml += `<img src="${v}" class="resp-foto" />`;
@@ -62,7 +65,7 @@ export async function visualizarChamado(c: ChamadoManutencao) {
         respostasHtml += '</div></div>';
       } else {
         const texto = typeof val === 'object' ? JSON.stringify(val) : String(val);
-        respostasHtml += `<div class="resp-item"><div class="resp-texto">${texto}</div></div>`;
+        respostasHtml += `<div class="resp-item">${rotuloHtml}<div class="resp-texto">${texto}</div></div>`;
       }
     });
     respostasHtml += '</div>';
@@ -118,6 +121,7 @@ export async function visualizarChamado(c: ChamadoManutencao) {
   /* Respostas */
   .resp-item { background: #f9fafb; border-radius: 12px; padding: 12px 16px; margin-bottom: 10px; border-left: 4px solid #6366f1; }
   .resp-badge { font-size: 10px; font-weight: 900; color: #6366f1; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .resp-campo { font-size: 11px; font-weight: 900; color: #6b7280; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 5px; }
   .resp-texto { font-size: 14px; color: #1f2937; line-height: 1.5; }
   .fotos-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
   .resp-foto { width: 140px; height: 105px; object-fit: cover; border-radius: 10px; border: 1.5px solid #e5e7eb; }

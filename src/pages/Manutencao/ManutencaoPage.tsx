@@ -14,6 +14,7 @@ import { useTilesPrefs, GearButton, TilesConfigModal, TilesRenderer, carregarTil
 import { usePin, PinModal } from '../../components/PinProtecao';
 import CompartilharModal from './CompartilharModal';
 import { apiReceberOS, apiConfirmarOS } from '../../utils/api';
+import { visualizarChamado } from '../../utils/visualizarChamado';
 import type { TileAction } from './TilesConfig';
 
 function gerarQrDataUrl(chamadoId: string): string {
@@ -1712,6 +1713,7 @@ const ManutencaoPage: React.FC = () => {
       const p = prev.map(c => c.id === preenchendoChamado.id ? {
         ...c,
         respostas: chamadoComRespostas.respostas,
+        respostasLabels: chamadoComRespostas.respostasLabels,
         status: 'concluido' as const,
         horarioFinal: Date.now(),
         tempoTotal: Date.now() - c.horarioInicial,
@@ -2024,6 +2026,14 @@ const ManutencaoPage: React.FC = () => {
       )}
 
       <div className={styles.chamadoAcoes}>
+        {/* Botão ver — visualização completa do que foi enviado */}
+        <button
+          onClick={() => visualizarChamado(c)}
+          style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, padding:'10px 16px', background:'#EEF2FF', border:'1.5px solid #C7D2FE', borderRadius:12, color:'#4338CA', cursor:'pointer', fontSize:14, fontWeight:800, fontFamily:'inherit' }}
+          title="Ver a ordem de serviço completa"
+        >
+          <Eye size={17} /> Ver
+        </button>
         {!concluido && c.status === 'aberto' && (
           <button className={styles.btnAndamento} onClick={() => iniciarEPreencher(c)}>
             <PlayCircle size={18} /> Iniciar

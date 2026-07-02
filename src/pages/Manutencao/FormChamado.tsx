@@ -901,6 +901,10 @@ const FormChamado: React.FC<Props> = ({
         horarioFinal: agora2,
         tempoTotal: agora2 - horarioInicial,
         respostas,
+        respostasLabels: Object.fromEntries(funcao.blocos.map(b => [
+          b.uid,
+          b.label || BLOCOS_DISPONIVEIS.find(d => d.id === b.tipo)?.nome || b.tipo,
+        ])),
         criadoPor: usuarioId,
         criadoPorNome: usuarioNome,
         criadoPorRole: usuarioRole,

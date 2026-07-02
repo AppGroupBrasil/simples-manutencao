@@ -60,6 +60,7 @@ export interface ChamadoManutencao {
   osNumero?: string;
   compartilhadoCom?: string[];
   compartilhadoPor?: string;
+  respostasLabels?: Record<string, string>;
 }
 
 // ── Dados de orçamento embutido no chamado ────────────────────────────────
