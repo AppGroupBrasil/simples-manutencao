@@ -22,28 +22,29 @@ function gerarChave() {
 
 const TOTAL_ETAPAS = 6;
 
-const WizardCriar: React.FC<Props> = ({ onConcluir, onCancelar }) => {
+const WizardCriar: React.FC<Props> = ({ funcaoEditar, onConcluir, onCancelar }) => {
+  const editando = !!funcaoEditar;
   const [etapa, setEtapa] = useState(1);
 
   // Etapa 1 — Nome
   const [nome, setNome] = useState('');
-  const [nomeCustom, setNomeCustom] = useState('');
-  const [modoCustom, setModoCustom] = useState(false);
+  const [nomeCustom, setNomeCustom] = useState(funcaoEditar?.nome ?? '');
+  const [modoCustom, setModoCustom] = useState(editando);
 
   // Etapa 2 — Ícone e cor
-  const [icone, setIcone] = useState('🔧');
-  const [cor, setCor] = useState('#FFD600');
+  const [icone, setIcone] = useState(funcaoEditar?.icone ?? '🔧');
+  const [cor, setCor] = useState(funcaoEditar?.cor ?? '#FFD600');
 
   // Etapa 3 — Blocos do formulário
-  const [blocosSelecionados, setBlocosSelecionados] = useState<BlocoSelecionado[]>([]);
-  const [categoriaAtiva, setCategoriaAtiva] = useState('basico');
+  const [blocosSelecionados, setBlocosSelecionados] = useState<BlocoSelecionado[]>(funcaoEditar?.blocos ?? []);
+  const [catIndex, setCatIndex] = useState(0);
 
   // Etapa 4 — Configurar dropdowns
   const [blocoEditando, setBlocoEditando] = useState<string | null>(null);
   const [novaOpcao, setNovaOpcao] = useState('');
 
   // Etapa 5 — QR Code
-  const [qrTipo, setQrTipo] = useState<FuncaoManutencao['qrTipo']>('nenhum');
+  const [qrTipo, setQrTipo] = useState<FuncaoManutencao['qrTipo']>(funcaoEditar?.qrTipo ?? 'nenhum');
 
   // Modal solicitar função
   const [modalSolicitar, setModalSolicitar] = useState(false);
@@ -66,41 +67,56 @@ const WizardCriar: React.FC<Props> = ({ onConcluir, onCancelar }) => {
     setModalSolicitar(false);
     setSolTitulo(''); setSolDescricao(''); setSolWhatsapp('');
   };
-  const [qrChave] = useState(gerarChave());
+  const [qrChave] = useState(funcaoEditar?.qrChave ?? gerarChave());
 
   // ── Navegação ────────────────────────────────────────────────────────────
 
   const nomeAtual = modoCustom ? nomeCustom : nome;
+  const catAtual = CATEGORIAS_BLOCOS[catIndex];
+  const ultimaCat = CATEGORIAS_BLOCOS.length - 1;
+  const temDropdown = blocosSelecionados.some(b => {
+    const def = BLOCOS_DISPONIVEIS.find(d => d.id === b.tipo);
+    return def?.temDropdown;
+  });
 
   const podeAvancar = () => {
     if (etapa === 1) return nomeAtual.trim().length > 0;
     if (etapa === 2) return true;
-    if (etapa === 3) return blocosSelecionados.length > 0;
+    if (etapa === 3) {
+      // Categorias intermediárias avançam livremente; só a última exige ≥1 bloco
+      if (catIndex < ultimaCat) return true;
+      return blocosSelecionados.length > 0;
+    }
     return true;
   };
 
   const avancar = () => {
     if (!podeAvancar()) return;
-    // Pula etapa 4 se não tiver blocos com dropdown
-    if (etapa === 3 && !blocosSelecionados.some(b => {
-      const def = BLOCOS_DISPONIVEIS.find(d => d.id === b.tipo);
-      return def?.temDropdown;
-    })) {
-      setEtapa(5);
-    } else {
-      setEtapa(e => Math.min(e + 1, TOTAL_ETAPAS));
+    if (etapa === 2) { setEtapa(3); setCatIndex(0); return; }
+    if (etapa === 3) {
+      // Percorre categoria por categoria
+      if (catIndex < ultimaCat) { setCatIndex(i => i + 1); return; }
+      // Última categoria → sai da etapa 3 (pula etapa 4 se não houver dropdown)
+      setEtapa(temDropdown ? 4 : 5);
+      return;
     }
+    setEtapa(e => Math.min(e + 1, TOTAL_ETAPAS));
   };
 
   const voltar = () => {
-    if (etapa === 5 && !blocosSelecionados.some(b => {
-      const def = BLOCOS_DISPONIVEIS.find(d => d.id === b.tipo);
-      return def?.temDropdown;
-    })) {
-      setEtapa(3);
-    } else {
-      setEtapa(e => Math.max(e - 1, 1));
+    if (etapa === 3) {
+      // Volta categoria por categoria; da primeira, retorna à etapa 2
+      if (catIndex > 0) { setCatIndex(i => i - 1); return; }
+      setEtapa(2);
+      return;
     }
+    // Ao voltar para a etapa 3, retoma na última categoria
+    if (etapa === 4) { setEtapa(3); setCatIndex(ultimaCat); return; }
+    if (etapa === 5) {
+      if (temDropdown) { setEtapa(4); return; }
+      setEtapa(3); setCatIndex(ultimaCat); return;
+    }
+    setEtapa(e => Math.max(e - 1, 1));
   };
 
   // ── Ações de blocos ──────────────────────────────────────────────────────
@@ -137,16 +153,16 @@ const WizardCriar: React.FC<Props> = ({ onConcluir, onCancelar }) => {
 
   const concluir = () => {
     const funcao: FuncaoManutencao = {
-      id: gerarId(),
+      id: funcaoEditar?.id ?? gerarId(),
       nome: nomeAtual.trim(),
       icone,
       cor,
       blocos: blocosSelecionados,
       qrTipo,
       qrChave: qrTipo === 'chave' ? qrChave : undefined,
-      criadoPor: '',
-      criadoEm: Date.now(),
-      ativo: true,
+      criadoPor: funcaoEditar?.criadoPor ?? '',
+      criadoEm: funcaoEditar?.criadoEm ?? Date.now(),
+      ativo: funcaoEditar?.ativo ?? true,
     };
     onConcluir(funcao);
   };
@@ -243,7 +259,7 @@ const WizardCriar: React.FC<Props> = ({ onConcluir, onCancelar }) => {
             <div className={styles.wizardTitulo}>
               <span className={styles.wizardIconeHeader}>🛠️</span>
               <span>
-                {etapa === 1 && <><strong>1</strong> — Criar nova função</>}
+                {etapa === 1 && <><strong>1</strong> — {editando ? 'Editar função' : 'Criar nova função'}</>}
                 {etapa === 2 && <><strong>2</strong> — Escolha o ícone e a cor</>}
                 {etapa === 3 && <><strong>3</strong> — Monte sua manutenção</>}
                 {etapa === 4 && <><strong>4</strong> — Configure os campos com lista</>}
@@ -322,7 +338,7 @@ const WizardCriar: React.FC<Props> = ({ onConcluir, onCancelar }) => {
 
               {nomeAtual && (
                 <div className={styles.previewNome}>
-                  Será criado: <strong>{nomeAtual}</strong>
+                  {editando ? 'Nome:' : 'Será criado:'} <strong>{nomeAtual}</strong>
                 </div>
               )}
 
@@ -388,23 +404,38 @@ const WizardCriar: React.FC<Props> = ({ onConcluir, onCancelar }) => {
               <div className={styles.etapaPergunta}>
                 O que vai conter na <strong>{nomeAtual}</strong>?
               </div>
-              <p className={styles.etapaHint}>Clique nas categorias para ver outros tipos de itens</p>
+              {/* Passo da categoria */}
+              <div className={styles.catStepTopo}>
+                <span className={styles.catStepBadge} style={{ background: catAtual.cor }}>
+                  {catAtual.label}
+                </span>
+                <span className={styles.catStepCount}>
+                  Categoria {catIndex + 1} de {CATEGORIAS_BLOCOS.length}
+                </span>
+              </div>
+              <p className={styles.etapaHint}>
+                {catIndex < ultimaCat
+                  ? 'Adicione os itens desta categoria e toque em Avançar para a próxima'
+                  : blocosSelecionados.length === 0
+                    ? 'Última categoria — adicione ao menos 1 item para concluir'
+                    : 'Última categoria — toque em Avançar para finalizar'}
+              </p>
 
-              {/* Categorias */}
+              {/* Trilha de categorias */}
               <div className={styles.categoriasBar}>
-                {CATEGORIAS_BLOCOS.map(cat => (
+                {CATEGORIAS_BLOCOS.map((cat, i) => (
                   <button
                     key={cat.id}
-                    className={`${styles.catBtn} ${categoriaAtiva === cat.id ? styles.catBtnAtivo : ''}`}
-                    style={categoriaAtiva === cat.id ? { background: cat.cor, color: '#fff', borderColor: cat.cor } : {}}
-                    onClick={() => setCategoriaAtiva(cat.id)}
+                    className={`${styles.catBtn} ${i === catIndex ? styles.catBtnAtivo : ''}`}
+                    style={i === catIndex ? { background: cat.cor, color: '#fff', borderColor: cat.cor } : {}}
+                    onClick={() => setCatIndex(i)}
                   >{cat.label}</button>
                 ))}
               </div>
 
               {/* Grid de blocos */}
               <div className={styles.blocosGrid}>
-                {BLOCOS_DISPONIVEIS.filter(b => b.categoria === categoriaAtiva).map(bloco => {
+                {BLOCOS_DISPONIVEIS.filter(b => b.categoria === catAtual.id).map(bloco => {
                   const qtd = blocosSelecionados.filter(b => b.tipo === bloco.id).length;
                   return (
                     <div key={bloco.id} style={{ position:'relative' }}>
@@ -651,7 +682,11 @@ const WizardCriar: React.FC<Props> = ({ onConcluir, onCancelar }) => {
             {etapa === 1 ? 'Cancelar' : 'Voltar'}
           </button>
 
-          <span className={styles.etapaIndicador}>{etapa} de {TOTAL_ETAPAS}</span>
+          <span className={styles.etapaIndicador}>
+            {etapa === 3
+              ? `Passo 3 · categoria ${catIndex + 1}/${CATEGORIAS_BLOCOS.length}`
+              : `${etapa} de ${TOTAL_ETAPAS}`}
+          </span>
 
           {etapa < TOTAL_ETAPAS ? (
             <button
@@ -663,7 +698,7 @@ const WizardCriar: React.FC<Props> = ({ onConcluir, onCancelar }) => {
             </button>
           ) : (
             <button className={styles.btnConcluir} onClick={concluir}>
-              <Check size={18} /> Criar Função
+              <Check size={18} /> {editando ? 'Salvar Alterações' : 'Criar Função'}
             </button>
           )}
         </div>
