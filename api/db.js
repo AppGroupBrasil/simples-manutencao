@@ -95,6 +95,31 @@ function rowToUsuario(row) {
   };
 }
 
+// ── Seed master (controle geral). Idempotente. ─────────────
+// Sem isto o master so existe local (fallback) e nunca tem sessao no
+// servidor -> os endpoints /admin/cliente/* ficariam inacessiveis.
+// Senha default = a mesma usada localmente; sobrescrevivel por env.
+(() => {
+  const email = (process.env.MASTER_EMAIL || 'eduardodominikus@hotmail.com').toLowerCase();
+  const senha = process.env.MASTER_SENHA || '123456';
+  const existente = stmtFindByEmail.get(email);
+  if (existente) {
+    // Garante o papel master mesmo que a conta ja exista com outro role.
+    if (existente.role !== 'master') {
+      db.prepare(`UPDATE usuarios SET role='master', atualizado_em=? WHERE id=?`).run(Date.now(), existente.id);
+    }
+    return;
+  }
+  try {
+    stmtInsertUser.run({
+      id: 'master', nome: 'Master', login: email, email,
+      senha, role: 'master', cargo: null,
+      adminId: null, supervisorId: null, administradorId: null,
+      bloqueado: 0, plano: null, cadastradoEm: Date.now(),
+    });
+  } catch (_) { /* corrida de concorrencia: ok */ }
+})();
+
 // ── Sync helpers ───────────────────────────────────────────
 const stmtUpsertSync = db.prepare(`
   INSERT INTO dados_sync (usuario_id, chave, valor, atualizado_em)

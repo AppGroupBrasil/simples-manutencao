@@ -229,6 +229,87 @@ app.post('/admin/set-role', (req, res) => {
   }
 });
 
+// ══════════════════════════════════════════════════════════════
+//  MASTER — controle geral de clientes (protegido por sessao+role)
+//  Guardado por role='master' via requireAuth (NUNCA por chave no
+//  bundle: a chave iria para todo browser e daria controle total).
+// ══════════════════════════════════════════════════════════════
+function requireMaster(req, res, next) {
+  requireAuth(req, res, () => {
+    if (!req.usuario || req.usuario.role !== 'master') {
+      return res.status(403).json({ error: 'Apenas master' });
+    }
+    next();
+  });
+}
+
+// Lista todos os administradores (contas/clientes) + nº de funcionários
+app.get('/admin/clientes', requireMaster, (req, res) => {
+  try {
+    const rows = db.prepare(`SELECT * FROM usuarios WHERE role = 'administrador' ORDER BY cadastrado_em DESC`).all();
+    const cntFunc = db.prepare(`SELECT COUNT(*) AS n FROM usuarios WHERE admin_id = ? AND id != ?`);
+    const clientes = rows.map(r => {
+      const { senha: _, ...safe } = rowToUsuario(r);
+      return { ...safe, funcionarios: cntFunc.get(r.id, r.id).n };
+    });
+    res.json({ clientes });
+  } catch (err) {
+    console.error('admin-clientes error:', err.message);
+    res.status(500).json({ error: 'Erro ao listar clientes' });
+  }
+});
+
+app.post('/admin/cliente/bloquear', requireMaster, (req, res) => {
+  const { userId } = req.body || {};
+  if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+  try {
+    db.prepare('UPDATE usuarios SET bloqueado = 1, atualizado_em = ? WHERE id = ?').run(Date.now(), userId);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/admin/cliente/desbloquear', requireMaster, (req, res) => {
+  const { userId } = req.body || {};
+  if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+  try {
+    db.prepare('UPDATE usuarios SET bloqueado = 0, atualizado_em = ? WHERE id = ?').run(Date.now(), userId);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/admin/cliente/editar', requireMaster, (req, res) => {
+  const { userId, nome, email, plano } = req.body || {};
+  if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
+  try {
+    const cur = stmtFindById.get(userId);
+    if (!cur) return res.status(404).json({ error: 'Cliente não encontrado' });
+    const novoNome  = nome  != null ? String(nome).trim() : cur.nome;
+    const novoEmail = email != null ? (String(email).trim().toLowerCase() || null) : cur.email;
+    const novoPlano = plano != null ? plano : cur.plano;
+    db.prepare('UPDATE usuarios SET nome = ?, email = ?, plano = ?, atualizado_em = ? WHERE id = ?')
+      .run(novoNome, novoEmail, novoPlano, Date.now(), userId);
+    const { senha: _, ...safe } = rowToUsuario(stmtFindById.get(userId));
+    res.json({ ok: true, cliente: safe });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Exclui o cliente + seus sub-usuários (funcionários) + dados sincronizados
+app.delete('/admin/cliente/:id', requireMaster, (req, res) => {
+  const id = req.params.id;
+  try {
+    const del = db.transaction((adminId) => {
+      const subs = db.prepare('SELECT id FROM usuarios WHERE admin_id = ?').all(adminId).map(r => r.id);
+      const ids = [...new Set([adminId, ...subs])];
+      const delSync = db.prepare('DELETE FROM dados_sync WHERE usuario_id = ?');
+      for (const uid of ids) delSync.run(uid);
+      db.prepare('DELETE FROM usuarios WHERE admin_id = ? AND id != ?').run(adminId, adminId);
+      db.prepare('DELETE FROM usuarios WHERE id = ?').run(adminId);
+    });
+    del(id);
+    res.json({ ok: true });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // ── POST /auth/register ────────────────────────────────────
 app.post('/auth/register', (req, res) => {
   try {

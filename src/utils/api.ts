@@ -76,6 +76,39 @@ export async function apiListUsers() {
   return apiFetch('/auth/users');
 }
 
+// ── Master: controle geral de clientes ─────────────────────
+export interface ClienteAdmin {
+  id: string;
+  nome: string;
+  login: string;
+  email?: string;
+  role: string;
+  bloqueado?: boolean;
+  plano?: 'individual' | 'empresa';
+  cadastradoEm?: number;
+  funcionarios?: number;
+}
+
+export async function apiListarClientes(): Promise<{ clientes: ClienteAdmin[] }> {
+  return apiFetch('/admin/clientes');
+}
+
+export async function apiBloquearCliente(userId: string) {
+  return apiFetch('/admin/cliente/bloquear', { method: 'POST', body: JSON.stringify({ userId }) });
+}
+
+export async function apiDesbloquearCliente(userId: string) {
+  return apiFetch('/admin/cliente/desbloquear', { method: 'POST', body: JSON.stringify({ userId }) });
+}
+
+export async function apiEditarCliente(userId: string, dados: { nome?: string; email?: string; plano?: string }) {
+  return apiFetch('/admin/cliente/editar', { method: 'POST', body: JSON.stringify({ userId, ...dados }) });
+}
+
+export async function apiExcluirCliente(userId: string) {
+  return apiFetch(`/admin/cliente/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+}
+
 // ── OS compartilhadas ──────────────────────────────────────
 export async function apiCompartilharOS(chamado: unknown, paraIds: string[]) {
   return apiFetch('/os/compartilhar', {

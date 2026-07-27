@@ -44,7 +44,7 @@ fi
 echo "Teste OK ($HTTP)"
 
 # Hash do bundle de entrada do build NOVO (para conferir depois se a producao serve ele mesmo)
-NEW_HASH=$(curl -s http://127.0.0.1:$TEST_PORT/ | grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' | head -1)
+NEW_HASH=$(curl -s http://127.0.0.1:$TEST_PORT/index.html | grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' | head -1)
 echo "Build novo: ${NEW_HASH:-?}"
 
 echo '[4/6] Swap: libera rota Traefik (para concorrentes) e sobe novo...'
@@ -86,7 +86,7 @@ for i in $(seq 1 20); do
   [ "$PROD" != "200" ] && continue
   # Sem NEW_HASH nao da pra conferir conteudo; basta o 200
   [ -z "$NEW_HASH" ] && break
-  PROD_HASH=$(curl -skL https://simplesmanutencao.com.br/ | grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' | head -1)
+  PROD_HASH=$(curl -skL https://simplesmanutencao.com.br/index.html | grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' | head -1)
   [ "$PROD_HASH" = "$NEW_HASH" ] && break
 done
 echo "Producao: HTTP $PROD, bundle $PROD_HASH (esperado $NEW_HASH)"

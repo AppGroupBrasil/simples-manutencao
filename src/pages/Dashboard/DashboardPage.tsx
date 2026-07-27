@@ -4,7 +4,11 @@ import {
   Search, Shield, ShieldOff, Pencil, Trash2,
   Users, CheckCircle, XCircle, Building2, Wifi, RefreshCw,
 } from 'lucide-react';
-import { useAuth, Usuario } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/AuthContext';
+import {
+  apiListarClientes, apiBloquearCliente, apiDesbloquearCliente,
+  apiEditarCliente, apiExcluirCliente, ClienteAdmin,
+} from '../../utils/api';
 import { usePin, PinModal } from '../../components/PinProtecao';
 import styles from './Dashboard.module.css';
 
@@ -23,8 +27,8 @@ interface IPRecord {
   trialExpirado: boolean;
 }
 
-interface ModalEditar { tipo: 'editar'; cliente: Usuario; }
-interface ModalExcluir { tipo: 'excluir'; cliente: Usuario; }
+interface ModalEditar { tipo: 'editar'; cliente: ClienteAdmin; }
+interface ModalExcluir { tipo: 'excluir'; cliente: ClienteAdmin; }
 type ModalState = ModalEditar | ModalExcluir | null;
 
 function inicialNome(nome: string) {
@@ -40,19 +44,12 @@ function diasCadastrado(ts?: number) {
   return `${dias} dias cadastrado`;
 }
 
-function contarRegistros(adminId: string, chave: string): number {
-  try {
-    const dados = JSON.parse(localStorage.getItem(chave) || '[]');
-    return dados.filter((item: any) => item.adminId === adminId || item.criadoPor === adminId).length;
-  } catch { return 0; }
-}
-
 function formatarDataHora(ts: number) {
   return new Date(ts).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
 export default function DashboardPage() {
-  const { usuario, listarAdmins, bloquearAdmin, desbloquearAdmin, excluirAdmin, editarAdmin } = useAuth();
+  const { usuario } = useAuth();
   const navigate = useNavigate();
   const { aberto: pinAberto, pedirPin, onSucesso: pinSucesso, onFechar: pinFechar } = usePin();
 
@@ -60,7 +57,9 @@ export default function DashboardPage() {
   const [aba, setAba] = useState<Aba>('clientes');
 
   // ── clientes ───────────────────────────────────────────
-  const [clientes, setClientes] = useState<Usuario[]>([]);
+  const [clientes, setClientes]           = useState<ClienteAdmin[]>([]);
+  const [clientesLoading, setClientesLoading] = useState(false);
+  const [clientesErro, setClientesErro]   = useState('');
   const [filtro, setFiltro]     = useState<Filtro>('todos');
   const [busca, setBusca]       = useState('');
   const [modal, setModal]       = useState<ModalState>(null);
@@ -77,7 +76,18 @@ export default function DashboardPage() {
     if (usuario && usuario.role !== 'master') navigate('/manutencao', { replace: true });
   }, [usuario, navigate]);
 
-  const recarregarClientes = () => setClientes(listarAdmins());
+  const recarregarClientes = async () => {
+    setClientesLoading(true);
+    setClientesErro('');
+    try {
+      const { clientes } = await apiListarClientes();
+      setClientes(clientes);
+    } catch (e: any) {
+      setClientesErro(e?.message || 'Não foi possível carregar os clientes do servidor.');
+    } finally {
+      setClientesLoading(false);
+    }
+  };
   useEffect(() => { recarregarClientes(); }, []);
 
   // ── carregar IPs ───────────────────────────────────────
@@ -150,33 +160,45 @@ export default function DashboardPage() {
   const totalIndividual = clientes.filter(c => c.plano === 'individual').length;
   const totalEmpresa    = clientes.filter(c => c.plano === 'empresa' || !c.plano).length;
 
-  function abrirEditar(c: Usuario) {
+  function abrirEditar(c: ClienteAdmin) {
     setEditForm({ nome: c.nome, email: c.email ?? '', plano: c.plano ?? 'empresa' });
     setModal({ tipo: 'editar', cliente: c });
   }
 
-  function salvarEditar() {
+  async function salvarEditar() {
     if (modal?.tipo !== 'editar') return;
-    editarAdmin(modal.cliente.id, {
-      nome:  editForm.nome.trim(),
-      email: editForm.email.trim().toLowerCase(),
-      plano: editForm.plano as 'individual' | 'empresa',
-    });
-    recarregarClientes();
-    setModal(null);
+    try {
+      await apiEditarCliente(modal.cliente.id, {
+        nome:  editForm.nome.trim(),
+        email: editForm.email.trim().toLowerCase(),
+        plano: editForm.plano,
+      });
+      setModal(null);
+      await recarregarClientes();
+    } catch (e: any) {
+      setClientesErro(e?.message || 'Falha ao salvar alterações.');
+    }
   }
 
-  function confirmarExcluir() {
+  async function confirmarExcluir() {
     if (modal?.tipo !== 'excluir') return;
-    excluirAdmin(modal.cliente.id);
-    recarregarClientes();
-    setModal(null);
+    try {
+      await apiExcluirCliente(modal.cliente.id);
+      setModal(null);
+      await recarregarClientes();
+    } catch (e: any) {
+      setClientesErro(e?.message || 'Falha ao excluir cliente.');
+    }
   }
 
-  function toggleBloquear(c: Usuario) {
-    if (c.bloqueado) desbloquearAdmin(c.id);
-    else bloquearAdmin(c.id);
-    recarregarClientes();
+  async function toggleBloquear(c: ClienteAdmin) {
+    try {
+      if (c.bloqueado) await apiDesbloquearCliente(c.id);
+      else await apiBloquearCliente(c.id);
+      await recarregarClientes();
+    } catch (e: any) {
+      setClientesErro(e?.message || 'Falha ao alterar bloqueio.');
+    }
   }
 
   return (
@@ -257,7 +279,17 @@ export default function DashboardPage() {
                 })()}
               </button>
             ))}
+            <button className={styles.filterBtn} onClick={recarregarClientes} disabled={clientesLoading}>
+              <RefreshCw size={14} style={{ display:'inline', marginRight:5 }} />
+              {clientesLoading ? 'Carregando...' : 'Atualizar'}
+            </button>
           </div>
+
+          {clientesErro && (
+            <div style={{ background:'#fee2e2', border:'1px solid #fca5a5', borderRadius:12, padding:'14px 18px', color:'#b91c1c', fontSize:13, marginBottom:16 }}>
+              ⚠️ {clientesErro}
+            </div>
+          )}
 
           {filtrados.length === 0 ? (
             <div className={styles.listaVazia}>
@@ -266,8 +298,6 @@ export default function DashboardPage() {
             </div>
           ) : (
             filtrados.map(c => {
-              const chamados = contarRegistros(c.id, 'manutencao_chamados_v2');
-              const funcoes  = contarRegistros(c.id, 'manutencao_funcoes_v2');
               return (
                 <div key={c.id} className={`${styles.clienteCard} ${c.bloqueado ? styles.clienteCardBloq : ''}`}>
                   <div className={`${styles.clienteAvatar} ${c.bloqueado ? styles.clienteAvatarBloq : ''}`}>
@@ -292,12 +322,8 @@ export default function DashboardPage() {
                   </div>
                   <div className={styles.clienteStats}>
                     <div className={styles.clienteStatItem}>
-                      <span className={styles.clienteStatNum}>{chamados}</span>
-                      <span>chamados</span>
-                    </div>
-                    <div className={styles.clienteStatItem}>
-                      <span className={styles.clienteStatNum}>{funcoes}</span>
-                      <span>funções</span>
+                      <span className={styles.clienteStatNum}>{c.funcionarios ?? 0}</span>
+                      <span>funcionários</span>
                     </div>
                   </div>
                   <div className={styles.acoes}>
