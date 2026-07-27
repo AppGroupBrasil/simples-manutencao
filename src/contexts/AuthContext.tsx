@@ -78,12 +78,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const s = localStorage.getItem(SESSION_KEY);
       if (s) {
-        setUsuario(JSON.parse(s));
-        // If we have a token, start auto-sync. Envia pendências offline ANTES de baixar,
-        // senão o download sobrescreveria alterações locais ainda não sincronizadas.
-        if (getToken()) {
-          startAutoSync();
-          syncUpload().catch(() => {}).then(() => syncDownload().catch(() => {}));
+        const sess = JSON.parse(s);
+        // Master sem token de servidor nao consegue usar nenhuma funcao master
+        // (lista de clientes, bloqueio, IPs). Descarta a sessao para forcar novo
+        // login no servidor -> evita a tela do master aparecer "zerada".
+        if (sess?.role === 'master' && !getToken()) {
+          localStorage.removeItem(SESSION_KEY);
+        } else {
+          setUsuario(sess);
+          // If we have a token, start auto-sync. Envia pendências offline ANTES de baixar,
+          // senão o download sobrescreveria alterações locais ainda não sincronizadas.
+          if (getToken()) {
+            startAutoSync();
+            syncUpload().catch(() => {}).then(() => syncDownload().catch(() => {}));
+          }
         }
       }
     } catch {}
