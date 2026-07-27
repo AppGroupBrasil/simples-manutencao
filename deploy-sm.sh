@@ -8,8 +8,22 @@ NEW_IMAGE=simples-manutencao:next
 TEST_NAME=simples-manutencao-test
 TEST_PORT=3503
 PROD_NAME=simples-manutencao
-# Detecta dinamicamente o container gerenciado pelo Coolify (o sufixo muda a cada redeploy)
-COOLIFY_NAME=$(docker ps -a --filter 'name=w8wkgccsk0000ok8ow0sks0s' --format '{{.Names}}' | head -1)
+HOST_RULE='Host(`simplesmanutencao.com.br`)'
+
+# Encontra containers EM EXECUCAO (exceto os nossos) que detem a rota Traefik do dominio.
+# Substitui a deteccao antiga por id fixo do Coolify (name=w8wk...), que quebrava quando o
+# sufixo do container mudava a cada redeploy do Coolify -> COOLIFY_NAME vinha vazio, o antigo
+# nunca era parado e o Traefik continuava servindo o build velho.
+detectar_concorrentes() {
+  local c
+  for c in $(docker ps --format '{{.Names}}'); do
+    [ "$c" = "$PROD_NAME" ] && continue
+    [ "$c" = "$TEST_NAME" ] && continue
+    if docker inspect "$c" --format '{{json .Config.Labels}}' 2>/dev/null | grep -qF "$HOST_RULE"; then
+      echo "$c"
+    fi
+  done
+}
 
 echo '[1/6] Build (Dockerfile: npm build a partir do fonte do git)...'
 docker build -t $NEW_IMAGE . || { echo 'BUILD FALHOU - producao intacta'; exit 1; }
@@ -29,8 +43,14 @@ if [ "$HTTP" != "200" ] && [ "$HTTP" != "301" ] && [ "$HTTP" != "302" ]; then
 fi
 echo "Teste OK ($HTTP)"
 
-echo '[4/6] Swap: para Coolify e sobe novo...'
-[ -n "$COOLIFY_NAME" ] && docker stop "$COOLIFY_NAME" 2>/dev/null || true
+# Hash do bundle de entrada do build NOVO (para conferir depois se a producao serve ele mesmo)
+NEW_HASH=$(curl -s http://127.0.0.1:$TEST_PORT/ | grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' | head -1)
+echo "Build novo: ${NEW_HASH:-?}"
+
+echo '[4/6] Swap: libera rota Traefik (para concorrentes) e sobe novo...'
+CONCORRENTES=$(detectar_concorrentes)
+[ -n "$CONCORRENTES" ] && echo "Concorrentes na rota: $CONCORRENTES"
+for c in $CONCORRENTES; do docker stop "$c" >/dev/null 2>&1 || true; done
 docker rm -f $PROD_NAME 2>/dev/null
 
 docker run -d --name $PROD_NAME --network coolify --restart unless-stopped \
@@ -50,18 +70,36 @@ docker run -d --name $PROD_NAME --network coolify --restart unless-stopped \
   -l 'traefik.http.services.simples-manutencao.loadbalancer.server.port=80' \
   $NEW_IMAGE
 
-echo '[5/6] Aguarda producao...'
-sleep 6
-PROD=$(curl -sk -o /dev/null -w '%{http_code}' https://simplesmanutencao.com.br/)
-echo "Producao retornou $PROD"
-
-if [ "$PROD" != "200" ] && [ "$PROD" != "301" ] && [ "$PROD" != "302" ]; then
-  echo 'PRODUCAO FALHOU - ROLLBACK Coolify'
+rollback() {
+  echo "$1"
   docker rm -f $PROD_NAME
-  [ -n "$COOLIFY_NAME" ] && docker start "$COOLIFY_NAME"
+  for c in $CONCORRENTES; do docker start "$c" >/dev/null 2>&1 || true; done
+  docker rm -f $TEST_NAME 2>/dev/null
   exit 1
+}
+
+echo '[5/6] Aguarda producao (HTTP 200 + build novo, ate 40s)...'
+PROD='' ; PROD_HASH=''
+for i in $(seq 1 20); do
+  sleep 2
+  PROD=$(curl -skL -o /dev/null -w '%{http_code}' https://simplesmanutencao.com.br/)
+  [ "$PROD" != "200" ] && continue
+  # Sem NEW_HASH nao da pra conferir conteudo; basta o 200
+  [ -z "$NEW_HASH" ] && break
+  PROD_HASH=$(curl -skL https://simplesmanutencao.com.br/ | grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' | head -1)
+  [ "$PROD_HASH" = "$NEW_HASH" ] && break
+done
+echo "Producao: HTTP $PROD, bundle $PROD_HASH (esperado $NEW_HASH)"
+
+if [ "$PROD" != "200" ]; then
+  rollback 'PRODUCAO FALHOU (HTTP) - ROLLBACK (reergue concorrentes)'
+fi
+# Confere que a producao serve o BUILD NOVO (nao um concorrente com build velho).
+# Sem isto o deploy reportava "OK" mesmo com o Traefik apontando pro container antigo.
+if [ -n "$NEW_HASH" ] && [ "$PROD_HASH" != "$NEW_HASH" ]; then
+  rollback "PRODUCAO SERVINDO BUILD ANTIGO ($PROD_HASH != $NEW_HASH) - ROLLBACK"
 fi
 
 echo '[6/6] Cleanup'
 docker rm -f $TEST_NAME 2>/dev/null
-echo "SM DEPLOY OK. Coolify ($COOLIFY_NAME) parado como backup."
+echo "SM DEPLOY OK. Concorrentes parados (backup): ${CONCORRENTES:-nenhum}"
