@@ -104,9 +104,16 @@ function rowToUsuario(row) {
   const senha = process.env.MASTER_SENHA || '123456';
   const existente = stmtFindByEmail.get(email);
   if (existente) {
-    // Garante o papel master mesmo que a conta ja exista com outro role.
-    if (existente.role !== 'master') {
-      db.prepare(`UPDATE usuarios SET role='master', atualizado_em=? WHERE id=?`).run(Date.now(), existente.id);
+    // Garante papel master e limpa vinculos legados (admin_id/supervisor_id): sem isso
+    // o master conta como "funcionario" de outro admin e poderia ser apagado numa
+    // exclusao em cascata desse admin.
+    const precisa = existente.role !== 'master'
+      || existente.admin_id != null
+      || existente.administrador_id != null
+      || existente.supervisor_id != null;
+    if (precisa) {
+      db.prepare(`UPDATE usuarios SET role='master', admin_id=NULL, administrador_id=NULL, supervisor_id=NULL, atualizado_em=? WHERE id=?`)
+        .run(Date.now(), existente.id);
     }
     return;
   }

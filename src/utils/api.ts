@@ -109,6 +109,28 @@ export async function apiExcluirCliente(userId: string) {
   return apiFetch(`/admin/cliente/${encodeURIComponent(userId)}`, { method: 'DELETE' });
 }
 
+// ── Master: controle de trial (IPs) — via sessao master (sem chave no bundle) ──
+export interface IPRecord {
+  ip: string;
+  emails: string[];
+  registradoEm: number;
+  bloqueado: boolean;
+  diasRegistrado: number;
+  trialExpirado: boolean;
+}
+
+export async function apiListarIPs(): Promise<{ ips: IPRecord[] }> {
+  return apiFetch('/trial/list');
+}
+
+export async function apiBloquearIP(ip: string) {
+  return apiFetch('/trial/block', { method: 'POST', body: JSON.stringify({ ip }) });
+}
+
+export async function apiDesbloquearIP(ip: string) {
+  return apiFetch('/trial/unblock', { method: 'DELETE', body: JSON.stringify({ ip }) });
+}
+
 // ── OS compartilhadas ──────────────────────────────────────
 export async function apiCompartilharOS(chamado: unknown, paraIds: string[]) {
   return apiFetch('/os/compartilhar', {

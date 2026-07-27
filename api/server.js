@@ -243,6 +243,13 @@ function requireMaster(req, res, next) {
   });
 }
 
+// Aceita x-api-key (uso server-to-server) OU sessao master. Assim o painel usa o
+// token do master logado e a chave real nunca precisa ir no bundle do frontend.
+function requireKeyOrMaster(req, res, next) {
+  if (req.headers['x-api-key'] === API_KEY) return next();
+  return requireMaster(req, res, next);
+}
+
 // Lista todos os administradores (contas/clientes) + nº de funcionários
 app.get('/admin/clientes', requireMaster, (req, res) => {
   try {
@@ -263,6 +270,9 @@ app.post('/admin/cliente/bloquear', requireMaster, (req, res) => {
   const { userId } = req.body || {};
   if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
   try {
+    const alvo = stmtFindById.get(userId);
+    if (!alvo) return res.status(404).json({ error: 'Cliente não encontrado' });
+    if (alvo.role === 'master') return res.status(403).json({ error: 'Não é possível bloquear a conta master' });
     db.prepare('UPDATE usuarios SET bloqueado = 1, atualizado_em = ? WHERE id = ?').run(Date.now(), userId);
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -272,6 +282,8 @@ app.post('/admin/cliente/desbloquear', requireMaster, (req, res) => {
   const { userId } = req.body || {};
   if (!userId) return res.status(400).json({ error: 'userId obrigatório' });
   try {
+    const alvo = stmtFindById.get(userId);
+    if (!alvo) return res.status(404).json({ error: 'Cliente não encontrado' });
     db.prepare('UPDATE usuarios SET bloqueado = 0, atualizado_em = ? WHERE id = ?').run(Date.now(), userId);
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -286,8 +298,18 @@ app.post('/admin/cliente/editar', requireMaster, (req, res) => {
     const novoNome  = nome  != null ? String(nome).trim() : cur.nome;
     const novoEmail = email != null ? (String(email).trim().toLowerCase() || null) : cur.email;
     const novoPlano = plano != null ? plano : cur.plano;
-    db.prepare('UPDATE usuarios SET nome = ?, email = ?, plano = ?, atualizado_em = ? WHERE id = ?')
-      .run(novoNome, novoEmail, novoPlano, Date.now(), userId);
+    // No cadastro login = email. Mantem os dois em sincronia quando o email muda,
+    // mas so se o cliente ainda usa o email como login (nao quebra login customizado).
+    let novoLogin = cur.login;
+    if (novoEmail && cur.login === cur.email && novoEmail !== cur.email) {
+      const conflito = stmtFindByLogin.get(novoEmail, novoEmail);
+      if (conflito && conflito.id !== userId) {
+        return res.status(409).json({ error: 'Já existe uma conta com esse e-mail' });
+      }
+      novoLogin = novoEmail;
+    }
+    db.prepare('UPDATE usuarios SET nome = ?, login = ?, email = ?, plano = ?, atualizado_em = ? WHERE id = ?')
+      .run(novoNome, novoLogin, novoEmail, novoPlano, Date.now(), userId);
     const { senha: _, ...safe } = rowToUsuario(stmtFindById.get(userId));
     res.json({ ok: true, cliente: safe });
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -297,12 +319,21 @@ app.post('/admin/cliente/editar', requireMaster, (req, res) => {
 app.delete('/admin/cliente/:id', requireMaster, (req, res) => {
   const id = req.params.id;
   try {
+    const alvo = stmtFindById.get(id);
+    if (!alvo) return res.status(404).json({ error: 'Cliente não encontrado' });
+    if (alvo.role === 'master') return res.status(403).json({ error: 'Não é possível excluir a conta master' });
+
     const del = db.transaction((adminId) => {
-      const subs = db.prepare('SELECT id FROM usuarios WHERE admin_id = ?').all(adminId).map(r => r.id);
+      // Sub-usuarios do cliente (funcionarios/supervisores). Nunca inclui um master,
+      // mesmo que por ligacao legada ele tenha admin_id apontando pra este cliente.
+      const subs = db.prepare(`SELECT id FROM usuarios WHERE admin_id = ? AND id != ? AND role != 'master'`)
+        .all(adminId, adminId).map(r => r.id);
       const ids = [...new Set([adminId, ...subs])];
-      const delSync = db.prepare('DELETE FROM dados_sync WHERE usuario_id = ?');
-      for (const uid of ids) delSync.run(uid);
-      db.prepare('DELETE FROM usuarios WHERE admin_id = ? AND id != ?').run(adminId, adminId);
+      const delSync  = db.prepare('DELETE FROM dados_sync WHERE usuario_id = ?');
+      const delOsC   = db.prepare('DELETE FROM os_compartilhadas WHERE para_id = ? OR de_id = ?');
+      const delReset = db.prepare('DELETE FROM reset_tokens WHERE usuario_id = ?');
+      for (const uid of ids) { delSync.run(uid); delOsC.run(uid, uid); delReset.run(uid); }
+      db.prepare(`DELETE FROM usuarios WHERE admin_id = ? AND id != ? AND role != 'master'`).run(adminId, adminId);
       db.prepare('DELETE FROM usuarios WHERE id = ?').run(adminId);
     });
     del(id);
@@ -704,7 +735,7 @@ app.post('/trial/register', (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/trial/list', requireKey, (req, res) => {
+app.get('/trial/list', requireKeyOrMaster, (req, res) => {
   const data = loadData();
   const now  = Date.now();
   const lista = data.ips.map(r => ({
@@ -715,7 +746,7 @@ app.get('/trial/list', requireKey, (req, res) => {
   res.json({ ips: lista });
 });
 
-app.delete('/trial/unblock', requireKey, (req, res) => {
+app.delete('/trial/unblock', requireKeyOrMaster, (req, res) => {
   const ip   = req.body?.ip;
   const data = loadData();
   if (!data.ips.find(r => r.ip === ip)) return res.status(404).json({ error: 'IP não encontrado' });
@@ -724,7 +755,7 @@ app.delete('/trial/unblock', requireKey, (req, res) => {
   res.json({ ok: true });
 });
 
-app.post('/trial/block', requireKey, (req, res) => {
+app.post('/trial/block', requireKeyOrMaster, (req, res) => {
   const ip   = req.body?.ip;
   const data = loadData();
   const rec  = data.ips.find(r => r.ip === ip);

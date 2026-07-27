@@ -8,24 +8,13 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   apiListarClientes, apiBloquearCliente, apiDesbloquearCliente,
   apiEditarCliente, apiExcluirCliente, ClienteAdmin,
+  apiListarIPs, apiBloquearIP, apiDesbloquearIP, IPRecord,
 } from '../../utils/api';
 import { usePin, PinModal } from '../../components/PinProtecao';
 import styles from './Dashboard.module.css';
 
-const TRIAL_API = 'https://api.simplesmanutencao.com.br';
-const API_KEY   = 'simples-api-key-2024';
-
 type Aba    = 'clientes' | 'ips';
 type Filtro = 'todos' | 'ativos' | 'bloqueados';
-
-interface IPRecord {
-  ip: string;
-  emails: string[];
-  registradoEm: number;
-  bloqueado: boolean;
-  diasRegistrado: number;
-  trialExpirado: boolean;
-}
 
 interface ModalEditar { tipo: 'editar'; cliente: ClienteAdmin; }
 interface ModalExcluir { tipo: 'excluir'; cliente: ClienteAdmin; }
@@ -83,7 +72,12 @@ export default function DashboardPage() {
       const { clientes } = await apiListarClientes();
       setClientes(clientes);
     } catch (e: any) {
-      setClientesErro(e?.message || 'Não foi possível carregar os clientes do servidor.');
+      const msg = e?.message || '';
+      setClientesErro(
+        /token/i.test(msg)
+          ? 'Sua sessão expirou. Saia e entre novamente para ver os clientes.'
+          : (msg || 'Não foi possível carregar os clientes do servidor.'),
+      );
     } finally {
       setClientesLoading(false);
     }
@@ -95,14 +89,15 @@ export default function DashboardPage() {
     setIpsLoading(true);
     setIpsErro('');
     try {
-      const resp = await fetch(`${TRIAL_API}/trial/list`, {
-        headers: { 'x-api-key': API_KEY },
-      });
-      if (!resp.ok) throw new Error('Erro na API');
-      const data = await resp.json();
-      setIps(data.ips || []);
-    } catch {
-      setIpsErro('Não foi possível conectar à API de trial. Verifique se o container está rodando.');
+      const { ips } = await apiListarIPs();
+      setIps(ips || []);
+    } catch (e: any) {
+      const msg = e?.message || '';
+      setIpsErro(
+        /token/i.test(msg)
+          ? 'Sua sessão expirou. Saia e entre novamente para ver os IPs.'
+          : 'Não foi possível carregar os IPs de trial.',
+      );
     } finally {
       setIpsLoading(false);
     }
@@ -112,11 +107,7 @@ export default function DashboardPage() {
 
   async function desbloquearIP(ip: string) {
     try {
-      await fetch(`${TRIAL_API}/trial/unblock`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
-        body: JSON.stringify({ ip }),
-      });
+      await apiDesbloquearIP(ip);
       carregarIPs();
     } catch {
       setIpsErro('Falha ao desbloquear IP.');
@@ -125,11 +116,7 @@ export default function DashboardPage() {
 
   async function bloquearIPManual(ip: string) {
     try {
-      await fetch(`${TRIAL_API}/trial/block`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': API_KEY },
-        body: JSON.stringify({ ip }),
-      });
+      await apiBloquearIP(ip);
       carregarIPs();
     } catch {
       setIpsErro('Falha ao bloquear IP.');
@@ -291,7 +278,12 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {filtrados.length === 0 ? (
+          {clientesLoading && clientes.length === 0 ? (
+            <div className={styles.listaVazia}>
+              <Building2 size={48} strokeWidth={1} />
+              <p>Carregando clientes...</p>
+            </div>
+          ) : filtrados.length === 0 ? (
             <div className={styles.listaVazia}>
               <Building2 size={48} strokeWidth={1} />
               <p>{clientes.length === 0 ? 'Nenhum cliente cadastrado ainda.' : 'Nenhum resultado para essa busca.'}</p>

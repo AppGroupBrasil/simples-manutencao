@@ -8,6 +8,7 @@ NEW_IMAGE=simples-manutencao:next
 TEST_NAME=simples-manutencao-test
 TEST_PORT=3503
 PROD_NAME=simples-manutencao
+BACKUP_NAME=simples-manutencao-old
 HOST_RULE='Host(`simplesmanutencao.com.br`)'
 
 # Encontra containers EM EXECUCAO (exceto os nossos) que detem a rota Traefik do dominio.
@@ -47,11 +48,22 @@ echo "Teste OK ($HTTP)"
 NEW_HASH=$(curl -s http://127.0.0.1:$TEST_PORT/index.html | grep -oE 'assets/index-[A-Za-z0-9_-]+\.js' | head -1)
 echo "Build novo: ${NEW_HASH:-?}"
 
-echo '[4/6] Swap: libera rota Traefik (para concorrentes) e sobe novo...'
+echo '[4/6] Swap: guarda prod atual como backup, libera rota e sobe novo...'
 CONCORRENTES=$(detectar_concorrentes)
 [ -n "$CONCORRENTES" ] && echo "Concorrentes na rota: $CONCORRENTES"
 for c in $CONCORRENTES; do docker stop "$c" >/dev/null 2>&1 || true; done
-docker rm -f $PROD_NAME 2>/dev/null
+
+# NAO destroi a producao atual antes de validar a nova: renomeia+para como backup.
+# Assim, se o container novo falhar a validacao, o rollback reergue o backup e o
+# site nunca fica sem nenhum container servindo a rota (falha do deploy anterior).
+docker rm -f $BACKUP_NAME 2>/dev/null
+BACKUP_OK=0
+if docker inspect $PROD_NAME >/dev/null 2>&1; then
+  if docker rename $PROD_NAME $BACKUP_NAME 2>/dev/null; then
+    docker stop $BACKUP_NAME >/dev/null 2>&1 || true
+    BACKUP_OK=1
+  fi
+fi
 
 docker run -d --name $PROD_NAME --network coolify --restart unless-stopped \
   -l traefik.enable=true \
@@ -72,7 +84,11 @@ docker run -d --name $PROD_NAME --network coolify --restart unless-stopped \
 
 rollback() {
   echo "$1"
-  docker rm -f $PROD_NAME
+  docker rm -f $PROD_NAME 2>/dev/null
+  # Reergue a producao anterior (backup) se ela existir; senao reergue concorrentes.
+  if [ "$BACKUP_OK" = "1" ] && docker rename $BACKUP_NAME $PROD_NAME 2>/dev/null; then
+    docker start $PROD_NAME >/dev/null 2>&1 || true
+  fi
   for c in $CONCORRENTES; do docker start "$c" >/dev/null 2>&1 || true; done
   docker rm -f $TEST_NAME 2>/dev/null
   exit 1
@@ -102,4 +118,5 @@ fi
 
 echo '[6/6] Cleanup'
 docker rm -f $TEST_NAME 2>/dev/null
+docker rm -f $BACKUP_NAME 2>/dev/null
 echo "SM DEPLOY OK. Concorrentes parados (backup): ${CONCORRENTES:-nenhum}"
