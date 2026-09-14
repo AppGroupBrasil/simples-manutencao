@@ -12,7 +12,7 @@ const {
   stmtUpdateSenha, stmtUpsertSync, stmtGetSync, stmtGetSyncKey,
   stmtInsertToken, stmtFindToken, stmtMarkTokenUsed, rowToUsuario,
   stmtInsertOsComp, stmtGetOsCompPara, stmtMarkOsCompRecebida,
-  stmtInsertOsLink, stmtGetOsLink, registrarAcesso,
+  stmtInsertOsLink, stmtGetOsLink, registrarAcesso, contaBloqueada, MSG_BLOQUEIO,
 } = require('./db');
 
 const app        = express();
@@ -121,6 +121,7 @@ function requireAuth(req, res, next) {
           });
           row = stmtFindById.get(payload.sub);
         }
+        if (contaBloqueada(row)) return res.status(403).json({ error: MSG_BLOQUEIO, bloqueado: true });
         req.usuario = rowToUsuario(row);
         registrarAcesso(req.usuario.id, 'uso', req);
         return next();
@@ -131,6 +132,7 @@ function requireAuth(req, res, next) {
   // Legado: token = userId direto
   const row = stmtFindById.get(token);
   if (!row) return res.status(401).json({ error: 'Token inválido' });
+  if (contaBloqueada(row)) return res.status(403).json({ error: MSG_BLOQUEIO, bloqueado: true });
   req.usuario = rowToUsuario(row);
   registrarAcesso(req.usuario.id, 'uso', req);
   next();
@@ -403,7 +405,7 @@ app.post('/auth/login', (req, res) => {
 
     const user = rowToUsuario(row);
     if (user.senha !== senha) return res.status(401).json({ error: 'Login ou senha incorretos' });
-    if (user.bloqueado) return res.status(403).json({ error: 'Conta bloqueada. Entre em contato com o suporte.' });
+    if (contaBloqueada(row)) return res.status(403).json({ error: MSG_BLOQUEIO, bloqueado: true });
 
     const { senha: _, ...safe } = user;
     registrarAcesso(user.id, 'login', req);

@@ -24,8 +24,20 @@ async function apiFetch(path: string, opts: RequestInit = {}) {
 
   const res = await fetch(`${API_URL}${path}`, { ...opts, headers });
   const data = await res.json();
+  if (res.status === 403 && data.bloqueado) encerrarContaBloqueada(data.error);
   if (!res.ok) throw new Error(data.error || 'Erro na API');
   return data;
+}
+
+export const MSG_BLOQUEIO_KEY = 'sm_msg_bloqueio';
+
+function encerrarContaBloqueada(msg: string) {
+  const tinhaSessao = !!localStorage.getItem('sm_session_v2');
+  clearToken();
+  localStorage.removeItem('sm_session_v2');
+  if (!tinhaSessao) return;
+  sessionStorage.setItem(MSG_BLOQUEIO_KEY, msg);
+  window.location.replace('/login');
 }
 
 // ── Auth ───────────────────────────────────────────────────

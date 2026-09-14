@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { setToken } from '../../utils/api';
+import { setToken, MSG_BLOQUEIO_KEY } from '../../utils/api';
 
 const API_URL = 'https://api.simplesmanutencao.com.br';
 const SESSION_KEY = 'sm_session_v2';
@@ -21,6 +21,11 @@ const SsoPage: React.FC = () => {
           body: JSON.stringify({ token }),
         });
         const data = await res.json();
+        if (res.status === 403 && data.bloqueado) {
+          sessionStorage.setItem(MSG_BLOQUEIO_KEY, data.error);
+          window.location.replace('/login');
+          return;
+        }
         if (!res.ok || !data.usuario) throw new Error(data.error || 'SSO inválido');
         setToken(data.token);
         localStorage.setItem(SESSION_KEY, JSON.stringify(data.usuario));

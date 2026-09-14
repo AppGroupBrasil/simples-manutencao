@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { apiForgotPassword } from '../../utils/api';
+import { apiForgotPassword, MSG_BLOQUEIO_KEY } from '../../utils/api';
 
 
 
@@ -12,7 +12,11 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const [loginStr, setLoginStr] = useState('');
   const [senha, setSenha]       = useState('');
-  const [erro, setErro]         = useState('');
+  const [erro, setErro]         = useState(() => {
+    const msg = sessionStorage.getItem(MSG_BLOQUEIO_KEY) || '';
+    sessionStorage.removeItem(MSG_BLOQUEIO_KEY);
+    return msg;
+  });
   const [loading, setLoading]   = useState(false);
   const [dicaLoginVisivel, setDicaLoginVisivel] = useState(false);
   const [dicaSenhaVisivel, setDicaSenhaVisivel] = useState(false);

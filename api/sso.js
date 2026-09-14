@@ -10,7 +10,7 @@
 const { Router } = require('express');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
-const { db, stmtFindById, stmtFindByEmail, stmtInsertUser, rowToUsuario, registrarAcesso } = require('./db');
+const { db, stmtFindById, stmtFindByEmail, stmtInsertUser, rowToUsuario, registrarAcesso, contaBloqueada, MSG_BLOQUEIO } = require('./db');
 
 const router = Router();
 const ISS = 'auth-central';
@@ -90,14 +90,14 @@ function provisionarUsuario(c) {
     const porEmail = stmtFindByEmail.get(email);
     if (porEmail) {
       // vincula o id central ao usuário existente por email (id é TEXT)
-      db.prepare('UPDATE usuarios SET id=?, nome=?, email=?, login=?, role=?, bloqueado=0, atualizado_em=? WHERE id=?')
+      db.prepare('UPDATE usuarios SET id=?, nome=?, email=?, login=?, role=?, atualizado_em=? WHERE id=?')
         .run(c.sub, nome, email, email, role, agora, porEmail.id);
       row = stmtFindById.get(c.sub);
     }
   }
 
   if (row) {
-    db.prepare('UPDATE usuarios SET nome=?, email=?, login=?, role=?, bloqueado=0, atualizado_em=? WHERE id=?')
+    db.prepare('UPDATE usuarios SET nome=?, email=?, login=?, role=?, atualizado_em=? WHERE id=?')
       .run(nome, email, email || row.login, role, agora, c.sub);
   } else {
     stmtInsertUser.run({
@@ -126,6 +126,7 @@ router.post('/', async (req, res) => {
   try {
     const claims = await verificarSso(token);
     const usuario = provisionarUsuario(claims);
+    if (contaBloqueada(stmtFindById.get(usuario.id))) return res.status(403).json({ error: MSG_BLOQUEIO, bloqueado: true });
     const { senha: _, ...safe } = usuario;
     registrarAcesso(usuario.id, 'sso', req);
     res.json({ ok: true, usuario: safe, token: usuario.id });

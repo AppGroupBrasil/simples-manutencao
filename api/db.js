@@ -95,6 +95,12 @@ function registrarAcesso(usuarioId, tipo, req) {
   }
 }
 
+const MSG_BLOQUEIO = 'Seu período de testes acabou.';
+const stmtContaBloqueada = db.prepare(`SELECT 1 FROM usuarios WHERE bloqueado = 1 AND role != 'master' AND id IN (?, ?) LIMIT 1`);
+function contaBloqueada(row) {
+  return !!(row && stmtContaBloqueada.get(row.id, row.admin_id || row.id));
+}
+
 // ── User helpers ───────────────────────────────────────────
 const stmtInsertUser = db.prepare(`
   INSERT INTO usuarios (id, nome, login, email, senha, role, cargo, admin_id, supervisor_id, administrador_id, bloqueado, plano, cadastrado_em)
@@ -191,7 +197,7 @@ const stmtMarkTokenUsed = db.prepare(`UPDATE reset_tokens SET usado = 1 WHERE to
 
 module.exports = {
   db,
-  registrarAcesso,
+  registrarAcesso, contaBloqueada, MSG_BLOQUEIO,
   stmtInsertUser,
   stmtFindByLogin,
   stmtFindByEmail,
