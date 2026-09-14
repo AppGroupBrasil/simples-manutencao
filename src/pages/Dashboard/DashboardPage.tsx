@@ -33,6 +33,16 @@ function diasCadastrado(ts?: number) {
   return `${dias} dias cadastrado`;
 }
 
+function ultimaAtividade(c: ClienteAdmin) {
+  return Math.max(c.ultimoAcesso ?? 0, c.ultimoSync ?? 0, c.ultimaOs ?? 0) || null;
+}
+
+function tempoDesde(ts: number | null) {
+  if (!ts) return '—';
+  const dias = Math.floor((Date.now() - ts) / (1000 * 60 * 60 * 24));
+  return dias === 0 ? 'hoje' : `${dias}d`;
+}
+
 function formatarDataHora(ts: number) {
   return new Date(ts).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 }
@@ -316,6 +326,22 @@ export default function DashboardPage() {
                     <div className={styles.clienteStatItem}>
                       <span className={styles.clienteStatNum}>{c.funcionarios ?? 0}</span>
                       <span>funcionários</span>
+                    </div>
+                    <div className={styles.clienteStatItem} title={`${c.acessos ?? 0} acessos registrados desde 14/09/2026`}>
+                      <span className={styles.clienteStatNum}>{c.acessos30d ?? 0}</span>
+                      <span>acessos 30d</span>
+                    </div>
+                    <div className={styles.clienteStatItem}>
+                      <span className={styles.clienteStatNum}>{c.diasAtivos30d ?? 0}</span>
+                      <span>dias ativos</span>
+                    </div>
+                    <div className={styles.clienteStatItem} title={c.ultimaOs ? `última OS ${formatarDataHora(c.ultimaOs)}` : 'nenhuma OS'}>
+                      <span className={styles.clienteStatNum}>{c.os ?? 0}</span>
+                      <span>OS</span>
+                    </div>
+                    <div className={styles.clienteStatItem}>
+                      <span className={styles.clienteStatNum}>{tempoDesde(ultimaAtividade(c))}</span>
+                      <span>últ. atividade</span>
                     </div>
                   </div>
                   <div className={styles.acoes}>

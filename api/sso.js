@@ -10,7 +10,7 @@
 const { Router } = require('express');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
-const { db, stmtFindById, stmtFindByEmail, stmtInsertUser, rowToUsuario } = require('./db');
+const { db, stmtFindById, stmtFindByEmail, stmtInsertUser, rowToUsuario, registrarAcesso } = require('./db');
 
 const router = Router();
 const ISS = 'auth-central';
@@ -127,6 +127,7 @@ router.post('/', async (req, res) => {
     const claims = await verificarSso(token);
     const usuario = provisionarUsuario(claims);
     const { senha: _, ...safe } = usuario;
+    registrarAcesso(usuario.id, 'sso', req);
     res.json({ ok: true, usuario: safe, token: usuario.id });
   } catch (err) {
     console.error('[SSO] falha:', (err && err.message) || err);

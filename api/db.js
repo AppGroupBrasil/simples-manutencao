@@ -63,7 +63,37 @@ db.exec(`
     expira_em  INTEGER NOT NULL,
     usado      INTEGER DEFAULT 0
   );
+
+  CREATE TABLE IF NOT EXISTS acessos (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id TEXT NOT NULL,
+    em         INTEGER NOT NULL,
+    tipo       TEXT NOT NULL,
+    ip         TEXT,
+    user_agent TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_acessos_usuario_em ON acessos (usuario_id, em);
 `);
+
+const stmtInsertAcesso = db.prepare(`INSERT INTO acessos (usuario_id, em, tipo, ip, user_agent) VALUES (?, ?, ?, ?, ?)`);
+const stmtUltimoAcesso = db.prepare(`SELECT MAX(em) AS em FROM acessos WHERE usuario_id = ?`);
+const JANELA_SESSAO_MS = 30 * 60 * 1000;
+const ultimoAcessoCache = new Map();
+
+function registrarAcesso(usuarioId, tipo, req) {
+  try {
+    const agora = Date.now();
+    let ultimo = ultimoAcessoCache.get(usuarioId);
+    if (ultimo === undefined) ultimo = stmtUltimoAcesso.get(usuarioId).em || 0;
+    ultimoAcessoCache.set(usuarioId, agora);
+    if (tipo === 'uso' && agora - ultimo < JANELA_SESSAO_MS) return;
+    const ip = String((req && (req.headers['x-forwarded-for'] || req.socket.remoteAddress)) || '').split(',')[0].trim().slice(0, 64) || null;
+    const ua = String((req && req.headers['user-agent']) || '').slice(0, 300) || null;
+    stmtInsertAcesso.run(usuarioId, agora, tipo, ip, ua);
+  } catch (err) {
+    console.error('registrar-acesso error:', err.message);
+  }
+}
 
 // ── User helpers ───────────────────────────────────────────
 const stmtInsertUser = db.prepare(`
@@ -161,6 +191,7 @@ const stmtMarkTokenUsed = db.prepare(`UPDATE reset_tokens SET usado = 1 WHERE to
 
 module.exports = {
   db,
+  registrarAcesso,
   stmtInsertUser,
   stmtFindByLogin,
   stmtFindByEmail,

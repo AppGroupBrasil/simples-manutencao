@@ -12,7 +12,7 @@ const {
   stmtUpdateSenha, stmtUpsertSync, stmtGetSync, stmtGetSyncKey,
   stmtInsertToken, stmtFindToken, stmtMarkTokenUsed, rowToUsuario,
   stmtInsertOsComp, stmtGetOsCompPara, stmtMarkOsCompRecebida,
-  stmtInsertOsLink, stmtGetOsLink,
+  stmtInsertOsLink, stmtGetOsLink, registrarAcesso,
 } = require('./db');
 
 const app        = express();
@@ -122,6 +122,7 @@ function requireAuth(req, res, next) {
           row = stmtFindById.get(payload.sub);
         }
         req.usuario = rowToUsuario(row);
+        registrarAcesso(req.usuario.id, 'uso', req);
         return next();
       }
     } catch (_) { /* nao e JWT central; cai pro legado */ }
@@ -131,6 +132,7 @@ function requireAuth(req, res, next) {
   const row = stmtFindById.get(token);
   if (!row) return res.status(401).json({ error: 'Token inválido' });
   req.usuario = rowToUsuario(row);
+  registrarAcesso(req.usuario.id, 'uso', req);
   next();
 }
 
@@ -255,9 +257,30 @@ app.get('/admin/clientes', requireMaster, (req, res) => {
   try {
     const rows = db.prepare(`SELECT * FROM usuarios WHERE role = 'administrador' ORDER BY cadastrado_em DESC`).all();
     const cntFunc = db.prepare(`SELECT COUNT(*) AS n FROM usuarios WHERE admin_id = ? AND id != ?`);
+    const statAcessos = db.prepare(`
+      SELECT COUNT(*) AS total, MAX(em) AS ultimo,
+             SUM(CASE WHEN em >= @desde THEN 1 ELSE 0 END) AS total30,
+             COUNT(DISTINCT CASE WHEN em >= @desde THEN date(em / 1000, 'unixepoch', '-3 hours') END) AS dias30
+      FROM acessos WHERE usuario_id IN (SELECT id FROM usuarios WHERE id = @id OR admin_id = @id)`);
+    const statSync = db.prepare(`SELECT MAX(atualizado_em) AS ultimo FROM dados_sync WHERE usuario_id IN (SELECT id FROM usuarios WHERE id = @id OR admin_id = @id)`);
+    const statOs = db.prepare(`
+      SELECT COUNT(*) AS total,
+             SUM(CASE WHEN json_extract(j.value, '$.criadoEm') >= @desde THEN 1 ELSE 0 END) AS total30,
+             MAX(json_extract(j.value, '$.criadoEm')) AS ultima
+      FROM dados_sync d, json_each(CASE WHEN json_valid(d.valor) THEN d.valor ELSE '[]' END) j
+      WHERE d.usuario_id = @id AND d.chave = 'manutencao_chamados_v2'`);
+    const desde = Date.now() - 30 * 24 * 60 * 60 * 1000;
     const clientes = rows.map(r => {
       const { senha: _, ...safe } = rowToUsuario(r);
-      return { ...safe, funcionarios: cntFunc.get(r.id, r.id).n };
+      const a = statAcessos.get({ id: r.id, desde });
+      const s = statSync.get({ id: r.id });
+      const o = statOs.get({ id: r.id, desde });
+      return {
+        ...safe,
+        funcionarios: cntFunc.get(r.id, r.id).n,
+        acessos: a.total, acessos30d: a.total30 || 0, diasAtivos30d: a.dias30, ultimoAcesso: a.ultimo,
+        os: o.total, os30d: o.total30 || 0, ultimaOs: o.ultima, ultimoSync: s.ultimo,
+      };
     });
     res.json({ clientes });
   } catch (err) {
@@ -383,6 +406,7 @@ app.post('/auth/login', (req, res) => {
     if (user.bloqueado) return res.status(403).json({ error: 'Conta bloqueada. Entre em contato com o suporte.' });
 
     const { senha: _, ...safe } = user;
+    registrarAcesso(user.id, 'login', req);
     res.json({ ok: true, usuario: safe, token: user.id });
   } catch (err) {
     console.error('login error:', err.message);

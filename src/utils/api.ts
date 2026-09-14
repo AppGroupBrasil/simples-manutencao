@@ -87,6 +87,14 @@ export interface ClienteAdmin {
   plano?: 'individual' | 'empresa';
   cadastradoEm?: number;
   funcionarios?: number;
+  acessos?: number;
+  acessos30d?: number;
+  diasAtivos30d?: number;
+  ultimoAcesso?: number | null;
+  os?: number;
+  os30d?: number;
+  ultimaOs?: number | null;
+  ultimoSync?: number | null;
 }
 
 export async function apiListarClientes(): Promise<{ clientes: ClienteAdmin[] }> {
