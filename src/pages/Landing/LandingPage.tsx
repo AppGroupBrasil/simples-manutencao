@@ -691,6 +691,7 @@ const LandingPage: React.FC = () => {
             <button className={styles.footerLink} onClick={() => navigate('/login')}>Entrar</button>
           </div>
           <p className={styles.footerCopy}>© {new Date().getFullYear()} Simples Manutenção. Todos os direitos reservados.</p>
+          <p className={styles.footerCopy}>Um sistema <a href="https://appgroupbrasil.com.br/" style={{ color: 'inherit', textDecoration: 'underline' }}>App Group Brasil</a></p>
         </div>
       </footer>
 
