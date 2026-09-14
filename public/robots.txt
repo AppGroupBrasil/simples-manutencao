@@ -1,0 +1,20 @@
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /manutencao
+Disallow: /meus-chamados
+Disallow: /chamado/
+Disallow: /checklist
+Disallow: /documento
+Disallow: /usuarios
+Disallow: /qrcodes
+Disallow: /tutorial
+Disallow: /sso
+Disallow: /contrato
+Disallow: /proposta
+Disallow: /os-
+Disallow: /preview-
+Disallow: /gerar-banner.html
+
+Sitemap: https://simplesmanutencao.com.br/sitemap.xml
